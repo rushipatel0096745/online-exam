@@ -70,17 +70,51 @@ const createQuestion = asyncHandler(async (req, res) => {
 
     const connection = await pool.getConnection();
 
-    const { subjectId } = req.params;
-    const { question_text, marks, negative_marks, options } = req.body;
+    try {
 
-    if (!options || options.length > 2) {
-        res.status(302).json(new ApiError(302, 'more than 2 options are required'));
-    } 
+        const { subjectId } = req.params;
+        const { question_text, marks, negative_marks, options } = req.body;
 
-    if (options.length === 1) {
-        res.status(302).json(new ApiError(302, 'more than 2 options are required provided only ones'));
+        if (!options || options.length < 2) {
+            return res.status(400).json(new ApiError(400, "At least 2 options are required"));
+        }
+
+        const correctCount = options.filter(opt => opt.is_correct).length;
+
+        if (correctCount !== 1) {
+            return res.status(400).json(new ApiError(400, "Exactly one correct options is required"));
+        }
+
+        await connection.beginTransaction();
+
+        const [questionResult] = await connection.query(
+            `INSERT INTO questions (subject_id, question_text, marks, negative_marks)
+             VALUES (?, ?, ?, ?)`,
+            [subjectId, question_text, marks, negative_marks]
+        );
+
+        const questionId = questionResult.insertId;
+
+        for (let option of options) {
+            await connection.query(
+                `INSERT INTO question_options (question_id, option_text, is_correct)
+                 VALUES (?, ?, ?)`,
+                [questionId, option.option_text, option.is_correct]
+            );
+        }
+
+        await connection.commit();
+
+        res.status(201).json(new ApiResponse(201, {questionId}, "Question created successfully"));
+
+    } catch (error) {
+        await connection.rollback();
+        throw error;
+
+    } finally {
+        connection.release();
     }
-    const pool = await pool;
+
 });
 
 // get exam by id
@@ -140,6 +174,101 @@ const getSubjectById = asyncHandler(async (req, res) => {
     res.status(200).json(new ApiResponse(200, subject, 'subject found successfully'));
 });
 
+const startExam = asyncHandler(async (req, res) => {
+
+    const { examId } = req.params;
+
+    // 1️⃣ Get exam
+    const [examRows] = await pool.query(
+        `SELECT id, title, total_duration_minutes 
+         FROM exams 
+         WHERE id = ? AND is_active = 1`,
+        [examId]
+    );
+
+    if (examRows.length === 0) {
+        return res.status(404).json({ message: "Exam not found" });
+    }
+
+    const exam = examRows[0];
+
+    // 2️⃣ Get subjects
+    const [subjects] = await pool.query(
+        `SELECT id, name, duration_minutes
+         FROM subjects
+         WHERE exam_id = ?
+         ORDER BY id`,
+        [examId]
+    );
+
+    // 3️⃣ Get all questions + options in single join
+    const [questionData] = await pool.query(
+        `SELECT 
+            q.id as question_id,
+            q.subject_id,
+            q.question_text,
+            q.marks,
+            o.id as option_id,
+            o.option_text
+         FROM questions q
+         JOIN question_options o ON q.id = o.question_id
+         WHERE q.subject_id IN (
+             SELECT id FROM subjects WHERE exam_id = ?
+         )
+         ORDER BY q.id`,
+        [examId]
+    );
+
+    // 🔥 Now we structure data properly
+
+    const questionMap = {};
+
+    questionData.forEach(row => {
+
+        if (!questionMap[row.question_id]) {
+            questionMap[row.question_id] = {
+                id: row.question_id,
+                subject_id: row.subject_id,
+                question_text: row.question_text,
+                marks: row.marks,
+                options: []
+            };
+        }
+
+        questionMap[row.question_id].options.push({
+            id: row.option_id,
+            option_text: row.option_text
+        });
+
+    });
+
+    const questions = Object.values(questionMap);
+
+    // 🔥 Group questions under subjects
+    const subjectMap = {};
+
+    subjects.forEach(sub => {
+        subjectMap[sub.id] = {
+            ...sub,
+            questions: []
+        };
+    });
+
+    questions.forEach(q => {
+        if (subjectMap[q.subject_id]) {
+            subjectMap[q.subject_id].questions.push(q);
+        }
+    });
+
+    const finalSubjects = Object.values(subjectMap);
+
+    res.json({
+        exam,
+        subjects: finalSubjects
+    });
+
+});
+
 export {
     createExam,
     createSubject,
@@ -147,4 +276,5 @@ export {
     getExamById,
     getSubjectsByExamId,
     getSubjectById,
+    startExam
 };

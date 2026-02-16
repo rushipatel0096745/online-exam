@@ -7,7 +7,7 @@ import jwt from 'jsonwebtoken';
 
 // admin login
 const adminLogin = asyncHandler(async (req, res) => {
-    const { email, password_hash, role } = req.body;
+    const { email, password } = req.body;
 
     const [users] = await pool.query('select * from users where email = ?', [email]);
 
@@ -15,16 +15,16 @@ const adminLogin = asyncHandler(async (req, res) => {
         throw new ApiError(404, 'user not found');
     }
 
-    if(role != 'admin') {
-        throw new ApiError(401, 'invalid role')
+    const user = users[0];
+    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+
+    if (!isPasswordValid) {
+        throw new ApiError(401, 'Invalid email or password');
     }
 
-    const user = users[0];
-    // const isPasswordValid = await bcrypt.compare(password_hash, user.password_hash);
-
-    // if (!isPasswordValid) {
-    //     throw new ApiError(401, 'Invalid email or password');
-    // }
+    if(user.role !== 'admin') {
+        throw new ApiError(403, 'Access denied. Not an admin user');
+    }
 
     const accessToken = jwt.sign({ id: user.id, email: user.email }, 'onlineexam', {
         expiresIn: '1d',
@@ -32,7 +32,8 @@ const adminLogin = asyncHandler(async (req, res) => {
 
     const options = {
         httpOnly: true,
-        secure: true,
+        // secure: true,
+        secure: false,
     };
 
     return res
@@ -52,9 +53,9 @@ const adminLogin = asyncHandler(async (req, res) => {
 
 // admin sign up
 const adminSignUp = asyncHandler(async (req, res) => {
-    const { email, role, full_name } = req.body;
+    const { email, role, full_name, password } = req.body;
 
-    const password_hash = await bcrypt.hash(req.body.password_hash, 10);
+    const password_hash = await bcrypt.hash(password, 10);
 
     const [result] = await pool.query(
         'INSERT INTO users(email, full_name, password_hash, role) values (?,?,?,?)',
