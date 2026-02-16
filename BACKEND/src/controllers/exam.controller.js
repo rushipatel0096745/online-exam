@@ -28,6 +28,7 @@ const createExam = asyncHandler(async (req, res) => {
     }
 });
 
+// create subject for exam
 const createSubject = asyncHandler(async (req, res) => {
     const { examId } = req.params;
 
@@ -65,4 +66,85 @@ const createSubject = asyncHandler(async (req, res) => {
     );
 });
 
-export { createExam, createSubject };
+const createQuestion = asyncHandler(async (req, res) => {
+
+    const connection = await pool.getConnection();
+
+    const { subjectId } = req.params;
+    const { question_text, marks, negative_marks, options } = req.body;
+
+    if (!options || options.length > 2) {
+        res.status(302).json(new ApiError(302, 'more than 2 options are required'));
+    } 
+
+    if (options.length === 1) {
+        res.status(302).json(new ApiError(302, 'more than 2 options are required provided only ones'));
+    }
+    const pool = await pool;
+});
+
+// get exam by id
+const getExamById = asyncHandler(async (req, res) => {
+    const { examId } = req.params;
+
+    if (!examId) {
+        res.status(402).json(new ApiError(402, 'exam id is invalid'));
+    }
+
+    const [exams] = await pool.query('select * from exams where id = ?', [Number(examId)]);
+
+    const exam = exams[0];
+    if (!exam) {
+        res.status(404).json(new ApiError(404, 'Exam id not found'));
+    }
+
+    res.status(200).json(new ApiResponse(200, exam, 'Exam found successfully'));
+});
+
+// get subject by exam id
+const getSubjectsByExamId = asyncHandler(async (req, res) => {
+    const { examId } = req.params;
+
+    if (!examId) {
+        res.status(402).json(new ApiError(402, 'exam id is invalid'));
+    }
+
+    const [subjects] = await pool.query('select * from subjects where exam_id = ?', [
+        Number(examId),
+    ]);
+
+    if (subjects.length === 0) {
+        res.status(404).json(new ApiError(404, 'Subject for this exam id not found'));
+    }
+
+    res.status(200).json(
+        new ApiResponse(200, subjects, 'Subject for this exam id found successfully')
+    );
+});
+
+// get subject by id
+const getSubjectById = asyncHandler(async (req, res) => {
+    const { subjectId } = req.params;
+
+    if (!subjectId) {
+        res.status(402).json(new ApiError(402, 'subject id is invalid'));
+    }
+
+    const [subjects] = await pool.query('select * from subjects where id = ?', [Number(subjectId)]);
+
+    const subject = subjects[0];
+    if (!subject) {
+        res.status(404).json(new ApiError(404, 'subject not found'));
+    }
+
+    res.status(200).json(new ApiResponse(200, subject, 'subject found successfully'));
+});
+
+export {
+    createExam,
+    createSubject,
+    createQuestion,
+    getExamById,
+    getSubjectsByExamId,
+    getSubjectById,
+};
