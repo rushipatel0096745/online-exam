@@ -48,38 +48,53 @@ const getExamByUserId = asyncHandler(async(req, res) => {
 // create subject for exam
 const createSubject = asyncHandler(async (req, res) => {
     const { examId } = req.params;
-
     const { name, subject_duration_minutes } = req.body;
 
-    const [data] = await pool.query('select name, order_index from subjects where exam_id = ?', [
-        examId,
-    ]);
-    console.log(data);
+    if (!name || !name.trim()) {
+        throw new ApiError(400, "Subject name is required");
+    }
 
-    let order_index = 0;
+    const [existing] = await pool.query(
+        'SELECT name, order_index FROM subjects WHERE exam_id = ?',
+        [examId]
+    );
 
-    if (data.length !== 0) {
-        data.map((item) => {
-            if (item.name === name) {
-                throw new ApiError(302, 'Subject already created for this exam');
-            }
-        });
+    // 🔹 Prevent duplicate subject name
+    for (let item of existing) {
+        if (item.name.toLowerCase() === name.trim().toLowerCase()) {
+            throw new ApiError(400, "Subject already exists for this exam");
+        }
+    }
 
-        order_index = data[data.length - 1].order_index;
+    let order_index = 1;
+
+    if (existing.length > 0) {
+        order_index = existing[existing.length - 1].order_index + 1;
     }
 
     const [result] = await pool.query(
-        'INSERT INTO subjects(exam_id, name, subject_duration_minutes, order_index) VALUES (?,?,?,?)',
+        `INSERT INTO subjects 
+         (exam_id, name, subject_duration_minutes, order_index) 
+         VALUES (?, ?, ?, ?)`,
         [
             Number(examId),
-            name,
-            Number(subject_duration_minutes),
-            order_index !== undefined ? order_index + 1 : 1,
+            name.trim(),
+            Number(subject_duration_minutes || 0),
+            order_index
         ]
     );
 
-    res.status(200).json(
-        new ApiResponse(200, result, `subject for exam ${examId} successfully created`)
+    // 🔥 Return the created subject object
+    const newSubject = {
+        id: result.insertId,
+        exam_id: Number(examId),
+        name: name.trim(),
+        subject_duration_minutes: Number(subject_duration_minutes || 0),
+        order_index
+    };
+
+    res.status(201).json(
+        new ApiResponse(201, newSubject, "Subject created successfully")
     );
 });
 
@@ -113,17 +128,35 @@ const createQuestion = asyncHandler(async (req, res) => {
 
         const questionId = questionResult.insertId;
 
+        const insertedOptions = [];
+
         for (let option of options) {
-            await connection.query(
-                `INSERT INTO question_options (question_id, option_text, is_correct)
+            const [optionResult] = await connection.query(
+                `INSERT INTO question_options 
+                 (question_id, option_text, is_correct)
                  VALUES (?, ?, ?)`,
                 [questionId, option.option_text, option.is_correct]
             );
+
+            insertedOptions.push({
+                id: optionResult.insertId,
+                option_text: option.option_text,
+                is_correct: option.is_correct
+            });
         }
 
         await connection.commit();
 
-        return res.status(201).json(new ApiResponse(201, { questionId }, 'Question created successfully'));
+        const createdQuestion = {
+            id: questionId,
+            subject_id: Number(subjectId),
+            question_text,
+            marks,
+            negative_marks,
+            options: insertedOptions
+        };
+
+        return res.status(201).json(new ApiResponse(201, createdQuestion, 'Question created successfully'));
     } catch (error) {
         await connection.rollback();
         throw error;

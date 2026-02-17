@@ -24,7 +24,7 @@ const ExamCreate = () => {
             .then((data) => {
                 console.log("respones data: ", data);
                 if (data.statusCode === 200) {
-                    navigate("/admin/exam/${data.data.id}/create");
+                    navigate(`/admin/exam/${data.data.id}/create`);
                 }
             })
             .catch((error) => console.log("error for posting data", JSON.stringify(error)));

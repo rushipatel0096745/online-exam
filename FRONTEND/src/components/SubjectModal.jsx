@@ -1,65 +1,116 @@
-import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
-import SubjectSidebar from "../components/SubjectSidebar";
-import SubjectModal from "../components/SubjectModal";
+import React, { useState } from "react";
+import { Modal, Button, Form, Alert, Spinner } from "react-bootstrap";
 
-const ExamBuilder = () => {
-    const url = "http://localhost:5000/api";
-    const { examId } = useParams();
+const SubjectModal = ({ examId, show, onClose, onSuccess }) => {
+  const url = "http://localhost:5000/api";
 
-    const [exam, setExam] = useState(null);
-    const [subjects, setSubjects] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [showAddSubjectModal, setShowAddSubjectModal] = useState(false);
+  const [name, setName] = useState("");
+  const [duration, setDuration] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
 
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                // Fetch exam
-                const examRes = await fetch(`${url}/exams/${examId}`);
-                const examData = await examRes.json();
-                setExam(examData.data);
+  const handleClose = () => {
+    // Reset state on close
+    setName("");
+    setError(null);
+    setSubmitting(false);
+    onClose();
+  };
 
-                // Fetch subjects
-                const subjectsRes = await fetch(`${url}/exams/${examId}/subjects`);
-                const subjectsData = await subjectsRes.json();
-                setSubjects(subjectsData.data);
-            } catch (err) {
-                setError(err.message);
-                console.log("Error fetching data:", err);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        if (examId) {
-            fetchData();
-        }
-    }, [examId]);
-
-    function handleAddSubject(newSubject) {
-        setSubjects((prev) => [...prev, newSubject]);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!name.trim()) {
+      setError("Subject name is required.");
+      return;
     }
 
-    if (loading) return <div>Loading...</div>;
-    if (error) return <div>Error: {error}</div>;
+    setSubmitting(true);
+    setError(null);
 
-    return (
-        <div className='row'>
-            <div className='col-4'>
-                <SubjectSidebar subjects={subjects} onAddSubject={() => setShowAddSubjectModal(true)} />
-            </div>
-            <div className='col-8'></div>
-            {/* add subject modal */}
-            <SubjectModal
-                examId={examId}
-                show={showAddSubjectModal}
-                onClose={() => setShowAddSubjectModal(false)}
-                onSuccess={handleAddSubject}
+    try {
+      const res = await fetch(`${url}/exams/${examId}/subjects`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          subject_duration_minutes: duration,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json();
+        throw new Error(errData.message || "Failed to create subject.");
+      }
+
+      const data = await res.json();
+      onSuccess(data.data); // Pass new subject up to parent
+      handleClose();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal show={show} onHide={handleClose} centered>
+      <Modal.Header closeButton>
+        <Modal.Title>Add Subject</Modal.Title>
+      </Modal.Header>
+
+      <Form onSubmit={handleSubmit}>
+        <Modal.Body>
+          {error && (
+            <Alert variant="danger" dismissible onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
+          <Form.Group controlId="subjectName">
+            {" "}
+            <Form.Label>Subject Name</Form.Label>{" "}
+            <Form.Control
+              type="text"
+              placeholder="e.g. Mathematics"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={submitting}
+              autoFocus
+            />{" "}
+          </Form.Group>
+          <Form.Group controlId="subjectDuration" className="mt-3">
+            <Form.Label>Duration (minutes)</Form.Label>
+            <Form.Control
+              type="number"
+              placeholder="e.g. 30"
+              value={duration}
+              onChange={(e) => setDuration(e.target.value)}
+              disabled={submitting}
             />
-        </div>
-    );
+          </Form.Group>
+        </Modal.Body>
+
+        <Modal.Footer>
+          <Button
+            variant="secondary"
+            onClick={handleClose}
+            disabled={submitting}
+          >
+            Cancel
+          </Button>
+          <Button variant="primary" type="submit" disabled={submitting}>
+            {submitting ? (
+              <>
+                <Spinner animation="border" size="sm" className="me-2" />
+                Saving...
+              </>
+            ) : (
+              "Add Subject"
+            )}
+          </Button>
+        </Modal.Footer>
+      </Form>
+    </Modal>
+  );
 };
 
-export default ExamBuilder;
+export default SubjectModal;

@@ -1,59 +1,107 @@
-import React, { useState } from "react";
-import "./SubjectSidebar.css";
+import React from "react";
+import { Button, ListGroup, Stack } from "react-bootstrap";
 
-const SubjectSidebar = ({ subjects, onSelectSubject, onAddSubject, onDeleteSubject }) => {
-    const [selectedSubjectId, setSelectedSubjectId] = useState(null);
+const SubjectSidebar = ({
+  subjects,
+  selectedSubject,
+  onSelectSubject,
+  onAddSubject,
+  onDeleteSubject,
+}) => {
 
-    const handleSelectSubject = (subject) => {
-        setSelectedSubjectId(subject.id);
-        if (onSelectSubject) {
-            onSelectSubject(subject);
-        }
-    };
+  const handleDeleteSubject = (e, subjectId) => {
+    e.stopPropagation();
+    onDeleteSubject?.(subjectId);
+  };
 
-    const handleDeleteSubject = (e, subjectId) => {
-        e.stopPropagation();
-        if (onDeleteSubject) {
-            onDeleteSubject(subjectId);
-        }
-    };
+  return (
+    <div
+      className="d-flex flex-column h-100 border-end"
+      style={{
+        backgroundColor: "#1e1e2f",
+        color: "#e4e6eb"
+      }}
+    >
 
-    return (
-        <div className='sidebar-container'>
-            <div className='sidebar-header'>
-                <h5 className='mb-0'>Subjects</h5>
-                <button className='btn btn-sm btn-primary ms-auto' onClick={onAddSubject}>
-                    + Add
-                </button>
-            </div>
-
-            <div className='subject-list'>
-                {subjects && subjects.length > 0 ? (
-                    subjects.map((subject) => (
-                        <div
-                            key={subject.id}
-                            className={`subject-item ${selectedSubjectId === subject.id ? "active" : ""}`}
-                            onClick={() => handleSelectSubject(subject)}>
-                            <div className='subject-content'>
-                                <h6 className='subject-name'>{subject.name}</h6>
-                            </div>
-                            <button
-                                className='btn-delete'
-                                onClick={(e) => handleDeleteSubject(e, subject.id)}
-                                title='Delete subject'>
-                                ×
-                            </button>
-                        </div>
-                    ))
-                ) : (
-                    <div className='empty-state'>
-                        <p>No subjects yet</p>
-                        <small>Click "Add" to create one</small>
-                    </div>
-                )}
-            </div>
+      {/* Header */}
+      <Stack
+        direction="horizontal"
+        className="justify-content-between align-items-center px-3 py-3 border-bottom"
+        style={{ borderColor: "#2c2f48" }}
+      >
+        <div>
+          <h6 className="mb-0 fw-semibold text-light">Subjects</h6>
+          <small className="text-secondary">
+            {subjects?.length || 0} total
+          </small>
         </div>
-    );
+
+        <Button
+          size="sm"
+          variant="outline-light"
+          onClick={onAddSubject}
+        >
+          + Add
+        </Button>
+      </Stack>
+
+      {/* Subject List */}
+      <div className="flex-grow-1 overflow-auto">
+
+        {subjects && subjects.length > 0 ? (
+          <ListGroup variant="flush">
+
+            {subjects.map((subject) => {
+              const isActive = selectedSubject?.id === subject.id;
+
+              return (
+                <ListGroup.Item
+                  key={subject.id}
+                  action
+                  onClick={() => onSelectSubject?.(subject)}
+                  className="d-flex justify-content-between align-items-center px-3 py-3 border-0"
+                  style={{
+                    cursor: "pointer",
+                    backgroundColor: isActive ? "#2c2f48" : "transparent",
+                    color: isActive ? "#ffffff" : "#c7c9d1",
+                    transition: "all 0.2s ease"
+                  }}
+                >
+                  <div className="d-flex flex-column">
+                    <span className="fw-medium text-truncate">
+                      {subject.name}
+                    </span>
+                    {subject.subject_duration_minutes && (
+                      <small className="text-secondary">
+                        {subject.subject_duration_minutes} mins
+                      </small>
+                    )}
+                  </div>
+
+                  <Button
+                    variant="link"
+                    size="sm"
+                    className="p-0 text-danger"
+                    style={{ fontSize: "1.1rem" }}
+                    onClick={(e) => handleDeleteSubject(e, subject.id)}
+                  >
+                    ×
+                  </Button>
+                </ListGroup.Item>
+              );
+            })}
+
+          </ListGroup>
+        ) : (
+          <div className="d-flex flex-column align-items-center justify-content-center text-secondary text-center py-5 px-3">
+            <p className="mb-1">No subjects yet</p>
+            <small>Click + Add to create one</small>
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
 };
 
 export default SubjectSidebar;
