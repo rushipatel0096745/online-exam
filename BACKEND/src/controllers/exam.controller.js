@@ -14,19 +14,36 @@ const createExam = asyncHandler(async (req, res) => {
         throw new ApiError(400, 'All fields are required');
     }
 
+    const [currenUserExams] = await pool.query('select * from exams where title = ?', [title]);
+
+    if (currenUserExams[0]) {
+        // return res.status(400).json(new ApiResponse(400, "", "Exam with this title already creaeted"))
+        throw new ApiError(400, 'Exam with this title already creaeted')
+    }
+
     try {
         const [result] = await pool.query(
             'INSERT INTO exams(title, total_duration_minutes, is_active, created_by) VALUES (?,?,?,?)',
             // [title, Number(total_duration_minutes), is_active, Number(current_user.id)]
-            [title, Number(total_duration_minutes), is_active, 7]
+            [title, Number(total_duration_minutes), 0, 7]
         );
 
-        res.status(200).json(new ApiResponse(200, result, 'exam created successfully'));
+        return res.status(200).json(new ApiResponse(200, result, 'exam created successfully'));
     } catch (error) {
         console.log(req.body);
         console.log(error);
     }
 });
+
+// get all exam by user id
+const getExamByUserId = asyncHandler(async(req, res) => {
+
+    const {userId} = req.params;
+
+    const [exams] = await pool.query("select * from exams where created_by = ? ", [userId]);
+
+    return res.status(200).json(new ApiResponse(200, exams, "success"))
+})
 
 // create subject for exam
 const createSubject = asyncHandler(async (req, res) => {
@@ -66,23 +83,24 @@ const createSubject = asyncHandler(async (req, res) => {
     );
 });
 
+// creating questions for subject
 const createQuestion = asyncHandler(async (req, res) => {
-
     const connection = await pool.getConnection();
 
     try {
-
         const { subjectId } = req.params;
         const { question_text, marks, negative_marks, options } = req.body;
 
         if (!options || options.length < 2) {
-            return res.status(400).json(new ApiError(400, "At least 2 options are required"));
+            return res.status(400).json(new ApiError(400, 'At least 2 options are required'));
         }
 
-        const correctCount = options.filter(opt => opt.is_correct).length;
+        const correctCount = options.filter((opt) => opt.is_correct).length;
 
         if (correctCount !== 1) {
-            return res.status(400).json(new ApiError(400, "Exactly one correct options is required"));
+            return res
+                .status(400)
+                .json(new ApiError(400, 'Exactly one correct options is required'));
         }
 
         await connection.beginTransaction();
@@ -105,16 +123,13 @@ const createQuestion = asyncHandler(async (req, res) => {
 
         await connection.commit();
 
-        res.status(201).json(new ApiResponse(201, {questionId}, "Question created successfully"));
-
+        return res.status(201).json(new ApiResponse(201, { questionId }, 'Question created successfully'));
     } catch (error) {
         await connection.rollback();
         throw error;
-
     } finally {
         connection.release();
     }
-
 });
 
 // get exam by id
@@ -122,17 +137,17 @@ const getExamById = asyncHandler(async (req, res) => {
     const { examId } = req.params;
 
     if (!examId) {
-        res.status(402).json(new ApiError(402, 'exam id is invalid'));
+        return res.status(402).json(new ApiError(402, 'exam id is invalid'));
     }
 
     const [exams] = await pool.query('select * from exams where id = ?', [Number(examId)]);
 
     const exam = exams[0];
     if (!exam) {
-        res.status(404).json(new ApiError(404, 'Exam id not found'));
+        return res.status(404).json(new ApiError(404, 'Exam id not found'));
     }
 
-    res.status(200).json(new ApiResponse(200, exam, 'Exam found successfully'));
+    return res.status(200).json(new ApiResponse(200, exam, 'Exam found successfully'));
 });
 
 // get subject by exam id
@@ -140,7 +155,7 @@ const getSubjectsByExamId = asyncHandler(async (req, res) => {
     const { examId } = req.params;
 
     if (!examId) {
-        res.status(402).json(new ApiError(402, 'exam id is invalid'));
+        return res.status(402).json(new ApiError(402, 'exam id is invalid'));
     }
 
     const [subjects] = await pool.query('select * from subjects where exam_id = ?', [
@@ -148,12 +163,12 @@ const getSubjectsByExamId = asyncHandler(async (req, res) => {
     ]);
 
     if (subjects.length === 0) {
-        res.status(404).json(new ApiError(404, 'Subject for this exam id not found'));
+        return res.status(404).json(new ApiError(404, 'Subject for not this exam id found'));
     }
 
-    res.status(200).json(
-        new ApiResponse(200, subjects, 'Subject for this exam id found successfully')
-    );
+    return res
+        .status(200)
+        .json(new ApiResponse(200, subjects, 'Subject for this exam id found successfully'));
 });
 
 // get subject by id
@@ -161,47 +176,44 @@ const getSubjectById = asyncHandler(async (req, res) => {
     const { subjectId } = req.params;
 
     if (!subjectId) {
-        res.status(402).json(new ApiError(402, 'subject id is invalid'));
+        return res.status(402).json(new ApiError(402, 'subject id is invalid'));
     }
 
     const [subjects] = await pool.query('select * from subjects where id = ?', [Number(subjectId)]);
 
     const subject = subjects[0];
     if (!subject) {
-        res.status(404).json(new ApiError(404, 'subject not found'));
+        return res.status(404).json(new ApiError(404, 'subject not found'));
     }
 
     res.status(200).json(new ApiResponse(200, subject, 'subject found successfully'));
 });
 
-const startExam = asyncHandler(async (req, res) => {
-
+// get questions with subject mapped for examid
+const getQuestionByExamId = asyncHandler(async (req, res) => {
     const { examId } = req.params;
 
-    // 1️⃣ Get exam
     const [examRows] = await pool.query(
         `SELECT id, title, total_duration_minutes 
          FROM exams 
-         WHERE id = ? AND is_active = 1`,
+         WHERE id = ? AND is_active = 0`,
         [examId]
     );
 
     if (examRows.length === 0) {
-        return res.status(404).json({ message: "Exam not found" });
+        return res.status(404).json({ message: 'Exam not found' });
     }
 
     const exam = examRows[0];
 
-    // 2️⃣ Get subjects
     const [subjects] = await pool.query(
-        `SELECT id, name, duration_minutes
+        `SELECT id, name, subject_duration_minutes
          FROM subjects
          WHERE exam_id = ?
          ORDER BY id`,
         [examId]
     );
 
-    // 3️⃣ Get all questions + options in single join
     const [questionData] = await pool.query(
         `SELECT 
             q.id as question_id,
@@ -219,42 +231,38 @@ const startExam = asyncHandler(async (req, res) => {
         [examId]
     );
 
-    // 🔥 Now we structure data properly
 
     const questionMap = {};
 
-    questionData.forEach(row => {
-
+    questionData.forEach((row) => {
         if (!questionMap[row.question_id]) {
             questionMap[row.question_id] = {
                 id: row.question_id,
                 subject_id: row.subject_id,
                 question_text: row.question_text,
                 marks: row.marks,
-                options: []
+                options: [],
             };
         }
 
         questionMap[row.question_id].options.push({
             id: row.option_id,
-            option_text: row.option_text
+            option_text: row.option_text,
         });
-
     });
 
     const questions = Object.values(questionMap);
 
-    // 🔥 Group questions under subjects
     const subjectMap = {};
 
-    subjects.forEach(sub => {
+    subjects.forEach((sub) => {
         subjectMap[sub.id] = {
             ...sub,
-            questions: []
+            questions: [],
         };
     });
 
-    questions.forEach(q => {
+    questions.forEach((q) => {
         if (subjectMap[q.subject_id]) {
             subjectMap[q.subject_id].questions.push(q);
         }
@@ -262,11 +270,10 @@ const startExam = asyncHandler(async (req, res) => {
 
     const finalSubjects = Object.values(subjectMap);
 
-    res.json({
+    return res.json({
         exam,
-        subjects: finalSubjects
+        subjects: finalSubjects,
     });
-
 });
 
 export {
@@ -274,7 +281,8 @@ export {
     createSubject,
     createQuestion,
     getExamById,
+    getExamByUserId,
     getSubjectsByExamId,
     getSubjectById,
-    startExam
+    getQuestionByExamId
 };
