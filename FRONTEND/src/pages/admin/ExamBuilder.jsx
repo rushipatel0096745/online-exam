@@ -136,9 +136,9 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useParams } from "react-router-dom";
 import { Container, Row, Col, Alert, Spinner } from "react-bootstrap";
-import SubjectSidebar from "../components/SubjectSidebar";
-import SubjectModal from "../components/SubjectModal";
-import SubjectContent from "../components/SubjectContent";
+import SubjectSidebar from "../../components/SubjectSidebar";
+import SubjectModal from "../../components/SubjectModal";
+import SubjectContent from "../../components/SubjectContent";
 
 const ExamBuilder = () => {
   const url = "http://localhost:5000/api";
@@ -150,8 +150,10 @@ const ExamBuilder = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showAddSubjectModal, setShowAddSubjectModal] = useState(false);
+  const [editSubject, setEditSubject] = useState(false);
+  const [mode, setMode] = useState();
 
-  // 🔥 Derive selected subject from subjects array
+
   const selectedSubject = useMemo(() => {
     return subjects.find((s) => s.id === selectedSubjectId) || null;
   }, [subjects, selectedSubjectId]);
@@ -184,13 +186,18 @@ const ExamBuilder = () => {
     }
   }, [examId]);
 
-  // 🔥 Add Subject
+  //  Add Subject
   function handleAddSubject(newSubject) {
     setSubjects((prev) => [...prev, { ...newSubject, questions: [] }]);
     setSelectedSubjectId(newSubject.id);
   }
 
-  // 🔥 Delete Subject
+  // Edit subject
+  // function handleEditSubject() {
+  //   setEditSubject(true)
+  // }
+
+  // Delete Subject
   function handleDeleteSubject(subjectId) {
     setSubjects((prev) => prev.filter((s) => s.id !== subjectId));
 
@@ -199,7 +206,7 @@ const ExamBuilder = () => {
     }
   }
 
-  // 🔥 Add Question
+  // Add Question
   function handleAddQuestion(newQuestion) {
     setSubjects((prev) =>
       prev.map((sub) =>
@@ -244,6 +251,7 @@ const ExamBuilder = () => {
             onSelectSubject={(subject) =>
               setSelectedSubjectId(subject.id)
             }
+            onEditSubject={() => setEditSubject(true)}
             onAddSubject={() => setShowAddSubjectModal(true)}
             onDeleteSubject={handleDeleteSubject}
           />
@@ -271,6 +279,7 @@ const ExamBuilder = () => {
         show={showAddSubjectModal}
         onClose={() => setShowAddSubjectModal(false)}
         onSuccess={handleAddSubject}
+        mode={editSubject ? 'edit' : 'create'}
       />
     </Container>
   );

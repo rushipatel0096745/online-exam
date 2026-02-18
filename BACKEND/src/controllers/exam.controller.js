@@ -17,8 +17,8 @@ const createExam = asyncHandler(async (req, res) => {
     const [currenUserExams] = await pool.query('select * from exams where title = ?', [title]);
 
     if (currenUserExams[0]) {
-        // return res.status(400).json(new ApiResponse(400, "", "Exam with this title already creaeted"))
-        throw new ApiError(400, 'Exam with this title already creaeted')
+        return res.status(400).json(new ApiResponse(400, "", "Exam with this title already creaeted"))
+        // throw new ApiError(400, 'Exam with this title already creaeted')
     }
 
     try {
@@ -28,7 +28,12 @@ const createExam = asyncHandler(async (req, res) => {
             [title, Number(total_duration_minutes), 0, 7]
         );
 
-        return res.status(200).json(new ApiResponse(200, result, 'exam created successfully'));
+        const lastInsertId = result.insertId;
+
+        const [exams] = await pool.query('select * from exams where id = ?', [lastInsertId])
+        const exam = exams[0]
+
+        return res.status(200).json(new ApiResponse(200, exam, 'exam created successfully'));
     } catch (error) {
         console.log(req.body);
         console.log(error);

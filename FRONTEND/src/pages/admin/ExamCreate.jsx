@@ -1,43 +1,53 @@
-import React from "react";
+import React, { useState } from "react";
+import { Alert } from "react-bootstrap";
 import { useForm } from "react-hook-form";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
-const ExamCreate = () => {
+const ExamCreate = ({ onAddExam }) => {
     const {
         register,
         handleSubmit,
         formState: { errors },
     } = useForm();
 
+    const [error, setError] = useState("");
+
     const navigate = useNavigate();
 
-    function onSubmit(data) {
-        fetch("http://localhost:5000/api/exams", {
-            method: "POST",
-            body: JSON.stringify(data),
-            headers: {
-                "Content-Type": "application/json",
+    async function onSubmit(data) {
+        try {
+            const res = await fetch("http://localhost:5000/api/exams", {
+                method: "POST",
+                body: JSON.stringify(data),
+                headers: {
+                    "Content-Type": "application/json",
+                },
                 credentials: "include",
-            },
-        })
-            .then((res) => res.json())
-            .then((data) => {
-                console.log("respones data: ", data);
-                if (data.statusCode === 200) {
-                    navigate(`/admin/exam/${data.data.id}/create`);
-                }
-            })
-            .catch((error) => console.log("error for posting data", JSON.stringify(error)));
+            });
+
+            const result = await res.json();
+
+            if (!res.ok) {
+                throw new Error(result.message);
+            }
+
+            onAddExam(result.data)
+
+        } catch (error) {
+            setError(error.message)
+            console.log(error.message)
+        }
     }
 
     return (
-        <div className='container'>
+        <div className='container-fluid mt-3'>
+            {error ? <Alert variant='danger'>{error}</Alert> : ""}
             <form className='w-50' onSubmit={handleSubmit(onSubmit)}>
                 <div className='mb-3'>
-                    <h3 className=''>New Exam</h3>
+                    <h3 className=''>Create Exam</h3>
                 </div>
                 <div className='mb-3'>
-                    <label htmlFor='title' classNameName='form-label'>
+                    <label htmlFor='title' className='form-label'>
                         Title
                     </label>
                     <input
@@ -53,7 +63,7 @@ const ExamCreate = () => {
                         Time duration in minutes
                     </label>
                     <input
-                        type='text'
+                        type='number'
                         className='form-control'
                         id='time_duration'
                         {...register("total_duration_minutes", { required: "Time duration is required" })}
@@ -62,10 +72,9 @@ const ExamCreate = () => {
                         <span className='form-error text-danger'>{errors.total_duration_minutes.message}</span>
                     )}
                 </div>
-                    <button type='submit' className='btn btn-primary'>
-                        Submit
-                    </button>
-     
+                <button type='submit' className='btn btn-primary'>
+                    Submit
+                </button>
             </form>
         </div>
     );
