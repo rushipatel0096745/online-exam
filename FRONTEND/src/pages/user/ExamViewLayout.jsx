@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { useExam } from "../../context/useExam";
 
 const ExamViewLayout = () => {
     const url = "http://localhost:5000/api/exams/4/questions";
@@ -8,6 +9,9 @@ const ExamViewLayout = () => {
     const [activeSubject, setActiveSubject] = useState();
     const [subjectQuestions, setSubjectQuestions] = useState([]);
     const [selectQuestion, setSelectQuestion] = useState({});
+
+    const { markForReviewQs, userAnswers, notVisitedQs, handleMarkForReview, handleSaveNext, handleClearResponse } =
+        useExam();
 
     async function fetchQuestions() {
         try {
@@ -82,26 +86,69 @@ const ExamViewLayout = () => {
             </div>
             <div className='row h-70'>
                 <div className='col-8 border'>
-                    <div className='question mt-2'>{selectQuestion.question_text}</div>
+                    <div className='question mt-2'>{selectQuestion?.question_text}</div>
                     <div className='options mt-3'>
-                        {selectQuestion.options.map((opt) => {
+                        {selectQuestion?.options?.map((opt) => {
                             return (
-                                <div className='option'>
-                                    <label htmlFor=''>
-                                        <input type='radio' name='option' /> {opt.option_text}
+                                <div className='option' key={opt.id}>
+                                    <label htmlFor={`opt-${opt.id}`}>
+                                        <input
+                                            type='radio'
+                                            name='option'
+                                            id={`opt-${opt.id}`}
+                                            value={opt.option_text}
+                                        />{" "}
+                                        {opt.option_text}
                                     </label>
                                 </div>
                             );
                         })}
                     </div>
-        
+
                     <div className='save-response d-flex justify-content-between mt-3 mb-2'>
                         <div className='mark-review'>
-                            <button className='btn btn-primary mx-2'> Mark for review & Save</button>
-                            <button className='btn btn-primary'>clear response</button>
+                            <button
+                                className='btn btn-primary mx-2'
+                                onClick={() => {
+                                    handleMarkForReview(selectQuestion?.id);
+
+                                    let nextQuestionId = 0;
+
+                                    subjectQuestions.map((que, index) => {
+                                        if(que.id === selectQuestion?.id) {
+                                            nextQuestionId = selectQuestion[index + 1]?.id
+                                        }
+                                    })
+                                    handleQuestion(nextQuestionId);
+                                }}>
+                                {" "}
+                                Mark for review & Save
+                            </button>
+                            <button
+                                className='btn btn-primary'
+                                onClick={() => {
+                                    handleClearResponse(selectQuestion?.id);
+
+                                    let nextQuestionId = 0;
+
+                                    subjectQuestions.map((que, index) => {
+                                        if(que.id === selectQuestion?.id) {
+                                            nextQuestionId = selectQuestion[index + 1]?.id
+                                        }
+                                    })
+                                    handleQuestion(nextQuestionId);
+                                }}>
+                                clear response
+                            </button>
                         </div>
                         <div className='save'>
-                            <button className='btn btn-primary'>Save & next</button>
+                            <button
+                                className='btn btn-primary'
+                                onClick={() => {
+                                    handleSaveNext(selectQuestion?.id, );
+                                }}>
+                                Save & next
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -111,10 +158,18 @@ const ExamViewLayout = () => {
                         <p className='text-center'>Question pallet</p>
                         <div className='row g-4 text-center'>
                             {subjectQuestions?.map((que, index) => {
+                                let btn = "primary";
+                                if (markForReviewQs.includes(que.id)) {
+                                    btn = "info";
+                                }
+                                if (userAnswers.some((ans) => ans.question_id === que.id)) {
+                                    btn = "success";
+                                }
+
                                 return (
                                     <div className='pal-btn col-4' key={que.id}>
                                         <button
-                                            className='btn btn-primary col-4'
+                                            className={`btn btn-${btn} col-4`}
                                             onClick={() => {
                                                 handleQuestion(que.id);
                                             }}>

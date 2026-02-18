@@ -7,20 +7,23 @@ import ExamCreate from "./pages/admin/ExamCreate";
 import ExamBuilder from "./pages/admin/ExamBuilder";
 import ExamView from "./pages/ExamView";
 import ExamViewLayout from "./pages/user/ExamViewLayout";
+import { ExamContextProvide } from "./context/useExam";
 
 function App() {
     const [count, setCount] = useState(0);
 
     return (
         <>
-            <Routes>
-                <Route path='/' element={<ExamView />} />
-                <Route path='/user' element={<ExamViewLayout />} />
-                <Route path='/admin/login' element={<AdminLogin />} />
-                <Route path='/admin/dashboard' element={<AdminDashboard />} />
-                <Route path='/admin/exam/create' element={<ExamCreate />} />
-                <Route path="/admin/exam/:examId/create" element={<ExamBuilder/>} />
-            </Routes>
+            <ExamContextProvide>
+                <Routes>
+                    <Route path='/' element={<ExamView />} />
+                    <Route path='/user' element={<ExamViewLayout />} />
+                    <Route path='/admin/login' element={<AdminLogin />} />
+                    <Route path='/admin/dashboard' element={<AdminDashboard />} />
+                    <Route path='/admin/exam/create' element={<ExamCreate />} />
+                    <Route path='/admin/exam/:examId/create' element={<ExamBuilder />} />
+                </Routes>
+            </ExamContextProvide>
         </>
     );
 }
