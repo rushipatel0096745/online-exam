@@ -177,11 +177,10 @@ const ExamViewLayout = () => {
                                 className='btn btn-primary'
                                 onClick={() => {
                                     if (!selectedOption) {
-                                        // handleNotAnswered(selectQuestion?.id);
                                         handleQuestionStatus(selectQuestion?.id, "not-answered");
+                                    } else {
+                                        handleQuestionStatus(selectQuestion?.id, "answered");
                                     }
-                                    // handleSaveNext(selectQuestion?.id, selectedOption);
-                                    handleQuestionStatus(selectQuestion?.id, "answered");
                                 }}>
                                 Save & next
                             </button>
@@ -219,18 +218,18 @@ const ExamViewLayout = () => {
                             })} */}
                             {subjectQuestions?.map((que, index) => {
                                 let btn = "primary";
-                                
-                                questionsStatus.map(ques => {
-                                    if(ques.questionId === que.id){
-                                        if(ques.status === 'marked-for-review') {
-                                            btn = 'info'
-                                        } else if(ques.status === 'answered'){
-                                            btn = 'success'
+
+                                questionsStatus.map((ques) => {
+                                    if (ques.questionId === que.id) {
+                                        if (ques.status === "marked-for-review") {
+                                            btn = "info";
+                                        } else if (ques.status === "answered") {
+                                            btn = "success";
                                         } else {
-                                            btn = 'danger'
+                                            btn = "danger";
                                         }
                                     }
-                                })
+                                });
 
                                 return (
                                     <div className='pal-btn col-4' key={que.id}>
