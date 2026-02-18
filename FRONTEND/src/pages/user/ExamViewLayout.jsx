@@ -10,6 +10,7 @@ const ExamViewLayout = () => {
     const [subjectQuestions, setSubjectQuestions] = useState([]);
     const [selectQuestion, setSelectQuestion] = useState({});
     const [selectedOption, setSelectedOption] = useState(null);
+    const [questionsStatus, setQuestionsStatus] = useState([{ questionId: 0, status: "" }]);
 
     const {
         markForReviewQs,
@@ -65,6 +66,24 @@ const ExamViewLayout = () => {
 
     function clearSelection() {
         setSelectedOption(null);
+    }
+
+    function handleQuestionStatus(questionId, status) {
+        let question = questionsStatus.find((que) => que.questionId === questionId);
+
+        if (!question) {
+            setQuestionsStatus((prev) => [...prev, { questionId: questionId, status: status }]);
+        } else {
+            setQuestionsStatus(
+                questionsStatus.map((que) => {
+                    if (que.questionId === questionId) {
+                        return { ...que, status: status };
+                    } else {
+                        return que;
+                    }
+                })
+            );
+        }
     }
 
     useEffect(() => {
@@ -128,16 +147,17 @@ const ExamViewLayout = () => {
                             <button
                                 className='btn btn-primary mx-2'
                                 onClick={() => {
-                                    handleMarkForReview(selectQuestion?.id);
+                                    handleQuestionStatus(selectQuestion?.id, "marked-for-review");
+                                    // handleMarkForReview(selectQuestion?.id);
 
-                                    let nextQuestionId = 0;
+                                    // let nextQuestionId = 0;
 
-                                    subjectQuestions.map((que, index) => {
-                                        if (que.id === selectQuestion?.id) {
-                                            nextQuestionId = selectQuestion[index + 1]?.id;
-                                        }
-                                    });
-                                    handleQuestion(nextQuestionId);
+                                    // subjectQuestions.map((que, index) => {
+                                    //     if (que.id === selectQuestion?.id) {
+                                    //         nextQuestionId = selectQuestion[index + 1]?.id;
+                                    //     }
+                                    // });
+                                    // handleQuestion(nextQuestionId);
                                 }}>
                                 {" "}
                                 Mark for review & Save
@@ -146,6 +166,7 @@ const ExamViewLayout = () => {
                                 className='btn btn-primary'
                                 onClick={() => {
                                     handleClearResponse(selectQuestion?.id);
+                                    handleQuestionStatus(selectQuestion?.id, "not-answered");
                                     clearSelection();
                                 }}>
                                 clear response
@@ -156,9 +177,11 @@ const ExamViewLayout = () => {
                                 className='btn btn-primary'
                                 onClick={() => {
                                     if (!selectedOption) {
-                                        handleNotAnswered(selectQuestion?.id)
+                                        // handleNotAnswered(selectQuestion?.id);
+                                        handleQuestionStatus(selectQuestion?.id, "not-answered");
                                     }
-                                    handleSaveNext(selectQuestion?.id, selectedOption);
+                                    // handleSaveNext(selectQuestion?.id, selectedOption);
+                                    handleQuestionStatus(selectQuestion?.id, "answered");
                                 }}>
                                 Save & next
                             </button>
@@ -170,7 +193,7 @@ const ExamViewLayout = () => {
                     <div className='question-pallet'>
                         <p className='text-center'>Question pallet</p>
                         <div className='row g-4 text-center'>
-                            {subjectQuestions?.map((que, index) => {
+                            {/* {subjectQuestions?.map((que, index) => {
                                 let btn = "primary";
                                 if (markForReviewQs.includes(que.id)) {
                                     btn = "info";
@@ -178,9 +201,36 @@ const ExamViewLayout = () => {
                                 if (userAnswers.some((ans) => ans.question_id === que.id)) {
                                     btn = "success";
                                 }
-                                if(notAnsweredQs.includes(que.id)){
-                                    btn = "danger"
+                                if (notAnsweredQs.includes(que.id)) {
+                                    btn = "danger";
                                 }
+
+                                return (
+                                    <div className='pal-btn col-4' key={que.id}>
+                                        <button
+                                            className={`btn btn-${btn} col-4`}
+                                            onClick={() => {
+                                                handleQuestion(que.id);
+                                            }}>
+                                            {index + 1}
+                                        </button>
+                                    </div>
+                                );
+                            })} */}
+                            {subjectQuestions?.map((que, index) => {
+                                let btn = "primary";
+                                
+                                questionsStatus.map(ques => {
+                                    if(ques.questionId === que.id){
+                                        if(ques.status === 'marked-for-review') {
+                                            btn = 'info'
+                                        } else if(ques.status === 'answered'){
+                                            btn = 'success'
+                                        } else {
+                                            btn = 'danger'
+                                        }
+                                    }
+                                })
 
                                 return (
                                     <div className='pal-btn col-4' key={que.id}>
