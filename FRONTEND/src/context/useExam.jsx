@@ -5,7 +5,7 @@ export const ExamContext = createContext();
 export const ExamContextProvide = function ({ children }) {
     const [markForReviewQs, setMarkForReviewQs] = useState([]); //this contains the question ids which marked
     const [userAnswers, setUserAnswers] = useState([]);
-    const [notVisitedQs, setNotVisitedQs] = useState([]);
+    const [notAnsweredQs, setNotAnsweredQs] = useState([]);
 
     function handleMarkForReview(questionId) {
         setMarkForReviewQs((prev) => [...prev, questionId]);
@@ -22,9 +22,13 @@ export const ExamContextProvide = function ({ children }) {
         }
     }
 
+    function handleNotAnswered(questionId) {
+        setNotAnsweredQs(prev => [...prev, questionId])
+    }
+
     return (
         <ExamContext.Provider
-            value={{ markForReviewQs, userAnswers, notVisitedQs, handleMarkForReview, handleSaveNext, handleClearResponse }}>
+            value={{ markForReviewQs, userAnswers, notAnsweredQs, handleMarkForReview, handleSaveNext, handleClearResponse, handleNotAnswered }}>
             {children}
         </ExamContext.Provider>
     );

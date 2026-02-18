@@ -9,9 +9,17 @@ const ExamViewLayout = () => {
     const [activeSubject, setActiveSubject] = useState();
     const [subjectQuestions, setSubjectQuestions] = useState([]);
     const [selectQuestion, setSelectQuestion] = useState({});
+    const [selectedOption, setSelectedOption] = useState(null);
 
-    const { markForReviewQs, userAnswers, notVisitedQs, handleMarkForReview, handleSaveNext, handleClearResponse } =
-        useExam();
+    const {
+        markForReviewQs,
+        userAnswers,
+        notAnsweredQs,
+        handleMarkForReview,
+        handleSaveNext,
+        handleClearResponse,
+        handleNotAnswered,
+    } = useExam();
 
     async function fetchQuestions() {
         try {
@@ -49,6 +57,14 @@ const ExamViewLayout = () => {
                 setSelectQuestion(que);
             }
         });
+    }
+
+    function handleOptionChange(event) {
+        setSelectedOption(event.target.value);
+    }
+
+    function clearSelection() {
+        setSelectedOption(null);
     }
 
     useEffect(() => {
@@ -95,6 +111,8 @@ const ExamViewLayout = () => {
                                         <input
                                             type='radio'
                                             name='option'
+                                            checked={selectedOption === opt.option_text}
+                                            onChange={handleOptionChange}
                                             id={`opt-${opt.id}`}
                                             value={opt.option_text}
                                         />{" "}
@@ -115,10 +133,10 @@ const ExamViewLayout = () => {
                                     let nextQuestionId = 0;
 
                                     subjectQuestions.map((que, index) => {
-                                        if(que.id === selectQuestion?.id) {
-                                            nextQuestionId = selectQuestion[index + 1]?.id
+                                        if (que.id === selectQuestion?.id) {
+                                            nextQuestionId = selectQuestion[index + 1]?.id;
                                         }
-                                    })
+                                    });
                                     handleQuestion(nextQuestionId);
                                 }}>
                                 {" "}
@@ -128,15 +146,7 @@ const ExamViewLayout = () => {
                                 className='btn btn-primary'
                                 onClick={() => {
                                     handleClearResponse(selectQuestion?.id);
-
-                                    let nextQuestionId = 0;
-
-                                    subjectQuestions.map((que, index) => {
-                                        if(que.id === selectQuestion?.id) {
-                                            nextQuestionId = selectQuestion[index + 1]?.id
-                                        }
-                                    })
-                                    handleQuestion(nextQuestionId);
+                                    clearSelection();
                                 }}>
                                 clear response
                             </button>
@@ -145,7 +155,10 @@ const ExamViewLayout = () => {
                             <button
                                 className='btn btn-primary'
                                 onClick={() => {
-                                    handleSaveNext(selectQuestion?.id, );
+                                    if (!selectedOption) {
+                                        handleNotAnswered(selectQuestion?.id)
+                                    }
+                                    handleSaveNext(selectQuestion?.id, selectedOption);
                                 }}>
                                 Save & next
                             </button>
@@ -164,6 +177,9 @@ const ExamViewLayout = () => {
                                 }
                                 if (userAnswers.some((ans) => ans.question_id === que.id)) {
                                     btn = "success";
+                                }
+                                if(notAnsweredQs.includes(que.id)){
+                                    btn = "danger"
                                 }
 
                                 return (
