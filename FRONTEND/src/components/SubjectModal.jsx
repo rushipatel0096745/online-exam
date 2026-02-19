@@ -72,7 +72,6 @@ const SubjectModal = ({ examId, show, onClose, onSuccess, mode }) => {
                         <Form.Label>Subject Name</Form.Label>{" "}
                         <Form.Control
                             type='text'
-                            placeholder='e.g. Mathematics'
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             disabled={submitting}
@@ -83,7 +82,6 @@ const SubjectModal = ({ examId, show, onClose, onSuccess, mode }) => {
                         <Form.Label>Duration (minutes)</Form.Label>
                         <Form.Control
                             type='number'
-                            placeholder='e.g. 30'
                             value={duration}
                             onChange={(e) => setDuration(e.target.value)}
                             disabled={submitting}

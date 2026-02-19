@@ -2,7 +2,7 @@ import { createContext, useContext, useState } from "react";
 
 export const ExamContext = createContext();
 
-export const ExamContextProvide = function ({ children }) {
+export const ExamContextProvider = function ({ children }) {
     const [markForReviewQs, setMarkForReviewQs] = useState([]); //this contains the question ids which marked
     const [userAnswers, setUserAnswers] = useState([]);
     const [notAnsweredQs, setNotAnsweredQs] = useState([]);

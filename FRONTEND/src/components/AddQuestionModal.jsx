@@ -122,7 +122,6 @@ const AddQuestionModal = ({ subjectId, show, onClose, onSuccess }) => {
               />
               <Form.Control
                 type="text"
-                placeholder={`Option ${index + 1}`}
                 value={opt.text}
                 onChange={(e) =>
                   handleOptionChange(index, e.target.value)

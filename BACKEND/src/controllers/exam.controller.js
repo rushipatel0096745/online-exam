@@ -17,7 +17,9 @@ const createExam = asyncHandler(async (req, res) => {
     const [currenUserExams] = await pool.query('select * from exams where title = ?', [title]);
 
     if (currenUserExams[0]) {
-        return res.status(400).json(new ApiResponse(400, "", "Exam with this title already creaeted"))
+        return res
+            .status(400)
+            .json(new ApiResponse(400, '', 'Exam with this title already creaeted'));
         // throw new ApiError(400, 'Exam with this title already creaeted')
     }
 
@@ -30,8 +32,8 @@ const createExam = asyncHandler(async (req, res) => {
 
         const lastInsertId = result.insertId;
 
-        const [exams] = await pool.query('select * from exams where id = ?', [lastInsertId])
-        const exam = exams[0]
+        const [exams] = await pool.query('select * from exams where id = ?', [lastInsertId]);
+        const exam = exams[0];
 
         return res.status(200).json(new ApiResponse(200, exam, 'exam created successfully'));
     } catch (error) {
@@ -40,15 +42,21 @@ const createExam = asyncHandler(async (req, res) => {
     }
 });
 
+// get all exams
+const getAllExams = asyncHandler(async (req, res) => {
+    const [exams] = await pool.query('select * from exams');
+
+    res.status(200).json(new ApiResponse(200, exams, 'All exams fetched successfully'));
+});
+
 // get all exam by user id
-const getExamByUserId = asyncHandler(async(req, res) => {
+const getExamByUserId = asyncHandler(async (req, res) => {
+    const { userId } = req.params;
 
-    const {userId} = req.params;
+    const [exams] = await pool.query('select * from exams where created_by = ? ', [userId]);
 
-    const [exams] = await pool.query("select * from exams where created_by = ? ", [userId]);
-
-    return res.status(200).json(new ApiResponse(200, exams, "success"))
-})
+    return res.status(200).json(new ApiResponse(200, exams, 'success'));
+});
 
 // create subject for exam
 const createSubject = asyncHandler(async (req, res) => {
@@ -56,7 +64,7 @@ const createSubject = asyncHandler(async (req, res) => {
     const { name, subject_duration_minutes } = req.body;
 
     if (!name || !name.trim()) {
-        throw new ApiError(400, "Subject name is required");
+        throw new ApiError(400, 'Subject name is required');
     }
 
     const [existing] = await pool.query(
@@ -67,7 +75,7 @@ const createSubject = asyncHandler(async (req, res) => {
     // 🔹 Prevent duplicate subject name
     for (let item of existing) {
         if (item.name.toLowerCase() === name.trim().toLowerCase()) {
-            throw new ApiError(400, "Subject already exists for this exam");
+            throw new ApiError(400, 'Subject already exists for this exam');
         }
     }
 
@@ -81,12 +89,7 @@ const createSubject = asyncHandler(async (req, res) => {
         `INSERT INTO subjects 
          (exam_id, name, subject_duration_minutes, order_index) 
          VALUES (?, ?, ?, ?)`,
-        [
-            Number(examId),
-            name.trim(),
-            Number(subject_duration_minutes || 0),
-            order_index
-        ]
+        [Number(examId), name.trim(), Number(subject_duration_minutes || 0), order_index]
     );
 
     // 🔥 Return the created subject object
@@ -95,12 +98,10 @@ const createSubject = asyncHandler(async (req, res) => {
         exam_id: Number(examId),
         name: name.trim(),
         subject_duration_minutes: Number(subject_duration_minutes || 0),
-        order_index
+        order_index,
     };
 
-    res.status(201).json(
-        new ApiResponse(201, newSubject, "Subject created successfully")
-    );
+    res.status(201).json(new ApiResponse(201, newSubject, 'Subject created successfully'));
 });
 
 // creating questions for subject
@@ -146,7 +147,7 @@ const createQuestion = asyncHandler(async (req, res) => {
             insertedOptions.push({
                 id: optionResult.insertId,
                 option_text: option.option_text,
-                is_correct: option.is_correct
+                is_correct: option.is_correct,
             });
         }
 
@@ -158,10 +159,12 @@ const createQuestion = asyncHandler(async (req, res) => {
             question_text,
             marks,
             negative_marks,
-            options: insertedOptions
+            options: insertedOptions,
         };
 
-        return res.status(201).json(new ApiResponse(201, createdQuestion, 'Question created successfully'));
+        return res
+            .status(201)
+            .json(new ApiResponse(201, createdQuestion, 'Question created successfully'));
     } catch (error) {
         await connection.rollback();
         throw error;
@@ -269,7 +272,6 @@ const getQuestionByExamId = asyncHandler(async (req, res) => {
         [examId]
     );
 
-
     const questionMap = {};
 
     questionData.forEach((row) => {
@@ -314,6 +316,75 @@ const getQuestionByExamId = asyncHandler(async (req, res) => {
     });
 });
 
+const storeStudentResult = asyncHandler(async (req, res) => {
+    const { userId, answers } = req.body;
+
+    if (Array.isArray(answers)) {
+        if (answers.length === 0) {
+            return;
+        }
+
+        const values = answers.map((ans) => [userId, ans.questionId, ans.selectedOptionId]);
+
+        try {
+            const [result] = await pool.query(
+                'insert into user_answers(user_id, question_id, option_id) values ?',
+                [values]
+            );
+            console.log(`Number of records inserted: ${result.affectedRows}`);
+            return res.status(200).json(new ApiResponse(200, result, 'answers submitted'));
+        } catch (error) {
+            console.log('error in inserting answers: ', error);
+            throw error;
+        }
+    }
+});
+
+const getResultData = asyncHandler(async (req, res) => {
+
+    // expects `examId` in request body (POST /result)
+    const { examId, isCorrect = 1 } = req.body;
+
+    if (!examId) {
+        throw new ApiError(400, 'examId is required in request body');
+    }
+
+    const sql = `SELECT s.id as subject_id, s.name as subject_name,
+                        q.id as question_id, q.question_text, qo.is_correct, q.marks
+                    FROM exams e
+                    INNER JOIN subjects s ON s.exam_id = e.id
+                    INNER JOIN questions q ON q.subject_id = s.id
+                    INNER JOIN question_options qo ON qo.question_id = q.id
+                    WHERE e.id = ? AND qo.is_correct = ?`;
+
+    const [results] = await pool.query(sql, [Number(examId), Number(isCorrect)]);
+
+    const structuredMap = new Map();
+
+    for (const row of results) {
+        const { subject_id, subject_name, question_id, question_text, is_correct, marks } = row;
+
+        if (!structuredMap.has(subject_id)) {
+            structuredMap.set(subject_id, {
+                subject_name,
+                questions: [],
+            });
+        }
+
+        structuredMap.get(subject_id).questions.push({
+            question_id,
+            question_text,
+            is_correct,
+            marks,
+        });
+    }
+
+    const structuredQuestions = Array.from(structuredMap.values());
+
+    return res.status(200).json(new ApiResponse(200, structuredQuestions, 'structured questions data'));
+
+});
+
 export {
     createExam,
     createSubject,
@@ -322,5 +393,8 @@ export {
     getExamByUserId,
     getSubjectsByExamId,
     getSubjectById,
-    getQuestionByExamId
+    getQuestionByExamId,
+    getAllExams,
+    storeStudentResult,
+    getResultData
 };

@@ -8,12 +8,21 @@ import bcrypt from 'bcrypt'
 const studentLogin = asyncHandler(async (req, res) => {
     const { email, password } = req.body;
 
-    
+    const [users] = await pool.query('SELECT * FROM users where email = ?', [email]);
 
-    const [rows] = await pool.query('SELECT * FROM tmp_user');
+    if(users.length === 0) {
+       return res.status(404).json(new ApiResponse(404, "", "no user found"))
+    }
+
+    const user = users[0];
+    const isPasswordValid = await bcrypt.compare(password, user.password_hash);
+
+    if(!isPasswordValid) {
+        return res.status(400).json(new ApiResponse(40, "", "Invalid email or password"))
+    }
 
     res.status(200).json(
-        new ApiResponse(200, rows, 'Tests fetched successfully')
+        new ApiResponse(200, user, 'Student logged in successfully')
     );
 });
 
