@@ -10,7 +10,10 @@ import {
     getQuestionByExamId,
     getAllExams,
     storeStudentResult,
-    getResultData
+    getResultData,
+    createUserExams,
+    getUserExams,
+    getUserAnswers
 } from '../controllers/exam.controller.js';
 import { verifyJWT } from '../middlewares/auth.middleware.js';
 
@@ -29,6 +32,10 @@ router.route('/:examId/subjects').post(createSubject);
 router.route('/:examId/questions').get(getQuestionByExamId);
 router.route('/subjects/:subjectId/question').post(createQuestion);
 router.route('/submit-result/:examId').post(storeStudentResult);
-router.route('/result').get(getResultData);
+router.route('/results/result').get(getResultData);
+router.route('/user/create').post(createUserExams);
+router.route('/user/exams').post(getUserExams);
+router.route('/user/answers').post(getUserAnswers);
+
 
 export default router;

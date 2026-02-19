@@ -8,7 +8,7 @@ const ExamViewLayout = () => {
 
     // const { user } = useAuth();
 
-    const user = JSON.parse(localStorage.getItem('user'));
+    const user = JSON.parse(localStorage.getItem("user"));
 
     const url = `http://localhost:5000/api/exams/${examId}/questions`;
 
@@ -127,25 +127,45 @@ const ExamViewLayout = () => {
     }
 
     async function submitAnswers() {
-        console.log(userAnswers)
+        console.log(userAnswers);
         try {
             const res = await fetch(`http://localhost:5000/api/exams/submit-result/${examId}`, {
                 method: "POST",
-                body: JSON.stringify({userId: user.id, answers: userAnswers}),
+                body: JSON.stringify({ userId: user.id, answers: userAnswers }),
                 headers: {
                     "Content-Type": "application/json",
                 },
             });
             const result = await res.json();
 
-            if(!res.ok) {
-                throw new Error(result.message)
+            if (!res.ok) {
+                throw new Error(result.message);
             }
 
-            console.log(result)
-
+            console.log(result);
         } catch (error) {
-            console.log("Error in submitting answers", error.message)
+            console.log("Error in submitting answers", error.message);
+        }
+    }
+
+    async function submitExam() {
+        try {
+            const res = await fetch(`http://localhost:5000/api/exams/user/create`, {
+                method: "POST",
+                body: JSON.stringify({ examId, userId: user.id }),
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            });
+            const result = await res.json();
+
+            if (!res.ok) {
+                throw new Error(result.message);
+            }
+
+            console.log(result);
+        } catch (error) {
+            console.log("Error in submitting answers", error.message);
         }
     }
 
@@ -315,7 +335,14 @@ const ExamViewLayout = () => {
                     </div>
                     <div className='row mt-5 mb-2'>
                         <div className='col-12 text-center'>
-                            <button className='btn btn-primary' onClick={submitAnswers}>Submit</button>
+                            <button
+                                className='btn btn-primary'
+                                onClick={() => {
+                                    submitAnswers();
+                                    submitExam();
+                                }}>
+                                Submit
+                            </button>
                             {/* <Link className='btn btn-primary' to={'/student/result'}>Submit</Link> */}
                         </div>
                     </div>

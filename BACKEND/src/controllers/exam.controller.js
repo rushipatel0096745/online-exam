@@ -341,8 +341,8 @@ const storeStudentResult = asyncHandler(async (req, res) => {
 });
 
 const getResultData = asyncHandler(async (req, res) => {
-    // const { examId } = req.params;
-    const { examId } = 4;
+    const { examId, userId } = req.body;
+    // const examId = 4;
 
     const [examRows] = await pool.query(
         `SELECT id, title, total_duration_minutes 
@@ -358,7 +358,7 @@ const getResultData = asyncHandler(async (req, res) => {
          FROM subjects
          WHERE exam_id = ?
          ORDER BY id`,
-        [examId]
+        [4]
     );
 
     const [questionData] = await pool.query(
@@ -368,7 +368,7 @@ const getResultData = asyncHandler(async (req, res) => {
             q.question_text,
             q.marks,
             o.id as option_id,
-            o.option_text
+            o.option_text,
             o.is_correct
          FROM questions q
          JOIN question_options o ON q.id = o.question_id
@@ -376,7 +376,7 @@ const getResultData = asyncHandler(async (req, res) => {
              SELECT id FROM subjects WHERE exam_id = ?
          )
          ORDER BY q.id`,
-        [examId]
+        [4]
     );
 
     const questionMap = {};
@@ -395,7 +395,7 @@ const getResultData = asyncHandler(async (req, res) => {
         questionMap[row.question_id].options.push({
             id: row.option_id,
             option_text: row.option_text,
-            is_correct: row.is_correct
+            is_correct: row.is_correct,
         });
     });
 
@@ -417,54 +417,105 @@ const getResultData = asyncHandler(async (req, res) => {
     });
 
     const finalSubjects = Object.values(subjectMap);
+    console.log(finalSubjects);
 
-    return res.status(200).json(finalSubjects)
+    const [userAnswers] = await pool.query('select * from user_answers where user_id = ?', [
+        userId,
+    ]);
+
+    const [question_result] =
+        await pool.query(`select q.id as question_id, q.question_text as question_text, qo.id as option_id, q.marks as marks
+                                                from exams e 
+                                                join subjects s on e.id = s.exam_id 
+                                                join questions q on q.subject_id = s.id 
+                                                join question_options qo on qo.question_id = q.id
+                                                where qo.is_correct = 1 and e.id = 4
+                                                `);
+    let score = 0;
+
+    question_result.map((que) => {
+        const ans = userAnswers.find((ans) => ans.question_id === que.question_id);
+        const marks = que.marks;
+        if (ans) {
+            if (ans.option_id === que.option_id) {
+                score += marks;
+            }
+        }
+    });
+
+    return res.status(200).json({ exam, score, resultData: finalSubjects });
 });
 
-// const getResultData = asyncHandler(async (req, res) => {
+const createUserExams = asyncHandler(async (req, res) => {
+    const { examId, userId } = req.body;
 
-//     // expects `examId` in request body (POST /result)
-//     const { examId, isCorrect = 1 } = req.body;
+    const [result] = await pool.query('insert into user_exams(user_id, exam_id) values (?,?)', [
+        userId,
+        examId,
+    ]);
 
-//     if (!examId) {
-//         throw new ApiError(400, 'examId is required in request body');
-//     }
+    return res.status(200).json(new ApiResponse(200, result, 'user exam created'));
+});
 
-//     const sql = `SELECT s.id as subject_id, s.name as subject_name,
-//                         q.id as question_id, q.question_text, qo.is_correct, q.marks
-//                     FROM exams e
-//                     INNER JOIN subjects s ON s.exam_id = e.id
-//                     INNER JOIN questions q ON q.subject_id = s.id
-//                     INNER JOIN question_options qo ON qo.question_id = q.id
-//                     WHERE e.id = ? AND qo.is_correct = ?`;
+const getUserExams = asyncHandler(async (req, res) => {
+    const { userId } = req.body;
 
-//     const [results] = await pool.query(sql, [Number(4), Number(1)]);
+    const [exams] = await pool.query(
+        `select e.id as exam_id, e.title as title, e.total_duration_minutes as total_time from 
+        user_exams ue 
+        join exams e on e.id = ue.exam_id
+        where user_id = ?`,
+        [userId]
+    );
 
-//     const structuredMap = new Map();
+    return res.status(200).json(new ApiResponse(200, exams, 'user exams'));
+});
 
-//     for (const row of results) {
-//         const { subject_id, subject_name, question_id, question_text, is_correct, marks } = row;
+const getUserAnswers = asyncHandler(async (req, res) => {
+    const { userId } = req.body;
+    const [result] = await pool.query(
+        `select u.user_id as user_id, u.question_id as question_id, u.option_id as option_id, o.option_text as option_text
+                from user_answers as u join question_options o on o.id = u.option_id where user_id = ?`,
+        [userId]
+    );
+    res.status(200).json(new ApiResponse(200, result, "user answers"))
+});
 
-//         if (!structuredMap.has(subject_id)) {
-//             structuredMap.set(subject_id, {
-//                 subject_name,
-//                 questions: [],
-//             });
-//         }
-
-//         structuredMap.get(subject_id).questions.push({
-//             question_id,
-//             question_text,
-//             is_correct,
-//             marks,
-//         });
-//     }
-
-//     const structuredQuestions = Array.from(structuredMap.values());
-
-//     return res.status(200).json(new ApiResponse(200, structuredQuestions, 'structured questions data'));
-
-// });
+const temp = function () {
+    // const getResultData = asyncHandler(async (req, res) => {
+    //     // expects `examId` in request body (POST /result)
+    //     const { examId, isCorrect = 1 } = req.body;
+    //     if (!examId) {
+    //         throw new ApiError(400, 'examId is required in request body');
+    //     }
+    //     const sql = `SELECT s.id as subject_id, s.name as subject_name,
+    //                         q.id as question_id, q.question_text, qo.is_correct, q.marks
+    //                     FROM exams e
+    //                     INNER JOIN subjects s ON s.exam_id = e.id
+    //                     INNER JOIN questions q ON q.subject_id = s.id
+    //                     INNER JOIN question_options qo ON qo.question_id = q.id
+    //                     WHERE e.id = ? AND qo.is_correct = ?`;
+    //     const [results] = await pool.query(sql, [Number(4), Number(1)]);
+    //     const structuredMap = new Map();
+    //     for (const row of results) {
+    //         const { subject_id, subject_name, question_id, question_text, is_correct, marks } = row;
+    //         if (!structuredMap.has(subject_id)) {
+    //             structuredMap.set(subject_id, {
+    //                 subject_name,
+    //                 questions: [],
+    //             });
+    //         }
+    //         structuredMap.get(subject_id).questions.push({
+    //             question_id,
+    //             question_text,
+    //             is_correct,
+    //             marks,
+    //         });
+    //     }
+    //     const structuredQuestions = Array.from(structuredMap.values());
+    //     return res.status(200).json(new ApiResponse(200, structuredQuestions, 'structured questions data'));
+    // });
+};
 
 export {
     createExam,
@@ -478,4 +529,7 @@ export {
     getAllExams,
     storeStudentResult,
     getResultData,
+    createUserExams,
+    getUserExams,
+    getUserAnswers
 };
