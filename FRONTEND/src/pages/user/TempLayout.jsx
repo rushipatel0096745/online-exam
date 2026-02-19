@@ -254,3 +254,351 @@ const ExamViewLayout = () => {
 };
 
 export default ExamViewLayout;
+import React, { useEffect, useState, useRef } from "react";
+import { useExam } from "../../context/useExam";
+import { useNavigate, useParams } from "react-router-dom";
+
+function formatTime(seconds) {
+    if (seconds <= 0) return "00:00";
+    const m = Math.floor(seconds / 60).toString().padStart(2, "0");
+    const s = (seconds % 60).toString().padStart(2, "0");
+    return `${m}:${s}`;
+}
+
+const ExamViewLayout = () => {
+    const { examId } = useParams();
+    const navigate = useNavigate();
+    const user = JSON.parse(localStorage.getItem("user"));
+    const url = `http://localhost:5000/api/exams/${examId}/questions`;
+
+    const [exam, setExam] = useState({ title: "", time_duration: 0 });
+    const [subjects, setSubjects] = useState([]);
+    const [activeSubject, setActiveSubject] = useState(null);
+    const [subjectQuestions, setSubjectQuestions] = useState([]);
+    const [selectQuestion, setSelectQuestion] = useState({});
+    const [selectedOption, setSelectedOption] = useState(null);
+    const [questionsStatus, setQuestionsStatus] = useState([]);
+    const [userAnswers, setUserAnswers] = useState([]);
+    const [lockedSubjects, setLockedSubjects] = useState([]);
+
+    // Timer states
+    const [totalTimeLeft, setTotalTimeLeft] = useState(0);
+    const [subjectTimers, setSubjectTimers] = useState({}); // { subjectId: secondsLeft }
+
+    // Just two simple interval refs
+    const totalIntervalRef = useRef(null);
+    const subjectIntervalRef = useRef(null);
+
+    const { handleClearResponse } = useExam();
+
+    // -------------------------
+    // FETCH
+    // -------------------------
+    async function fetchQuestions() {
+        const res = await fetch(url);
+        const result = await res.json();
+
+        setExam({
+            title: result.exam.title,
+            time_duration: result.exam.total_duration_minutes,
+        });
+        setSubjects(result.subjects);
+        setActiveSubject(result.subjects[0]);
+        setSubjectQuestions(result.subjects[0].questions);
+        setSelectQuestion(result.subjects[0].questions[0]);
+
+        // Set total timer
+        setTotalTimeLeft(result.exam.total_duration_minutes * 60);
+
+        // Set each subject timer
+        const timers = {};
+        result.subjects.forEach((sub) => {
+            timers[sub.id] = sub.subject_duration_minutes * 60;
+        });
+        setSubjectTimers(timers);
+    }
+
+    // -------------------------
+    // TOTAL TIMER
+    // -------------------------
+    useEffect(() => {
+        if (totalTimeLeft <= 0) return;
+
+        clearInterval(totalIntervalRef.current);
+
+        totalIntervalRef.current = setInterval(() => {
+            setTotalTimeLeft((prev) => {
+                if (prev <= 1) {
+                    clearInterval(totalIntervalRef.current);
+                    clearInterval(subjectIntervalRef.current);
+                    alert("Total exam time is up! Auto-submitting.");
+                    handleFinalSubmit();
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+
+        return () => clearInterval(totalIntervalRef.current);
+    }, [totalTimeLeft === 0]); // only re-run if it hits 0
+
+    // -------------------------
+    // SUBJECT TIMER
+    // — restarts whenever activeSubject changes
+    // -------------------------
+    useEffect(() => {
+        if (!activeSubject) return;
+        if (lockedSubjects.includes(activeSubject.id)) return;
+
+        clearInterval(subjectIntervalRef.current);
+
+        subjectIntervalRef.current = setInterval(() => {
+            setSubjectTimers((prev) => {
+                const current = prev[activeSubject.id];
+
+                if (current <= 1) {
+                    clearInterval(subjectIntervalRef.current);
+                    setLockedSubjects((locked) => [...locked, activeSubject.id]);
+                    alert("Subject time is up! This subject is now locked.");
+                    return { ...prev, [activeSubject.id]: 0 };
+                }
+
+                return { ...prev, [activeSubject.id]: current - 1 };
+            });
+        }, 1000);
+
+        // Pause when switching away from this subject
+        return () => clearInterval(subjectIntervalRef.current);
+
+    }, [activeSubject]); // re-runs on subject switch = pause old, start new
+
+    // -------------------------
+    // SUBMIT
+    // -------------------------
+    async function submitAnswers() {
+        await fetch(`http://localhost:5000/api/exams/submit-result/${examId}`, {
+            method: "POST",
+            body: JSON.stringify({ userId: user.id, answers: userAnswers }),
+            headers: { "Content-Type": "application/json" },
+        });
+    }
+
+    async function submitExam() {
+        await fetch(`http://localhost:5000/api/exams/user/create`, {
+            method: "POST",
+            body: JSON.stringify({ examId, userId: user.id }),
+            headers: { "Content-Type": "application/json" },
+        });
+    }
+
+    async function handleFinalSubmit() {
+        clearInterval(totalIntervalRef.current);
+        clearInterval(subjectIntervalRef.current);
+        await submitAnswers();
+        await submitExam();
+        navigate("/student/result");
+    }
+
+    // -------------------------
+    // HANDLERS
+    // -------------------------
+    function handleSubject(subjectId) {
+        if (lockedSubjects.includes(subjectId)) {
+            alert("This subject is locked. Time has expired.");
+            return;
+        }
+        const subject = subjects.find((s) => s.id === subjectId);
+        setActiveSubject(subject); // this triggers the subject timer useEffect
+        setSubjectQuestions(subject.questions);
+        setSelectQuestion(subject.questions[0]);
+        setSelectedOption(null);
+    }
+
+    function handleQuestion(questionId) {
+        const question = subjectQuestions.find((q) => q.id === questionId);
+        if (question) {
+            setSelectQuestion(question);
+            const saved = userAnswers.find((ans) => ans.questionId === questionId);
+            setSelectedOption(saved ? saved.selectedOptionId : null);
+        }
+    }
+
+    function goToNextQuestion() {
+        const currentIndex = subjectQuestions.findIndex((q) => q.id === selectQuestion?.id);
+        if (currentIndex !== -1 && currentIndex < subjectQuestions.length - 1) {
+            setSelectQuestion(subjectQuestions[currentIndex + 1]);
+        }
+    }
+
+    function handleOptionChange(e) {
+        setSelectedOption(Number(e.target.value));
+    }
+
+    function clearSelection() {
+        setSelectedOption(null);
+    }
+
+    function handleQuestionStatus(questionId, status) {
+        setQuestionsStatus((prev) => {
+            const exists = prev.find((q) => q.questionId === questionId);
+            if (!exists) return [...prev, { questionId, status }];
+            return prev.map((q) => q.questionId === questionId ? { ...q, status } : q);
+        });
+    }
+
+    function saveAnswer(questionId, optionId) {
+        setUserAnswers((prev) => {
+            const exists = prev.find((ans) => ans.questionId === questionId);
+            if (exists) {
+                return prev.map((ans) =>
+                    ans.questionId === questionId ? { ...ans, selectedOptionId: optionId } : ans
+                );
+            }
+            return [...prev, { questionId, selectedOptionId: optionId }];
+        });
+    }
+
+    useEffect(() => {
+        fetchQuestions();
+        return () => {
+            clearInterval(totalIntervalRef.current);
+            clearInterval(subjectIntervalRef.current);
+        };
+    }, []);
+
+    const isSubjectLocked = activeSubject && lockedSubjects.includes(activeSubject.id);
+    const activeSubjectTimeLeft = activeSubject ? subjectTimers[activeSubject.id] : 0;
+
+    return (
+        <div className='container-fluid h-100'>
+            <div className='row h-30'>
+                <div className='col-8 border'>
+                    <h4>{exam.title}</h4>
+                    <div className='d-flex flex-end'>
+                        {subjects.map((subject) => (
+                            <div className='sub-btn' key={subject.id}>
+                                <button
+                                    className={`btn ${lockedSubjects.includes(subject.id) ? "btn-danger" : "btn-primary"} mx-1`}
+                                    onClick={() => handleSubject(subject.id)}>
+                                    {subject.name} {lockedSubjects.includes(subject.id) && "🔒"}
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+                <div className='col-4 border'>
+                    <p><b className='fs-3'>{user.full_name}</b></p>
+                    <p style={{ color: totalTimeLeft <= 300 ? "red" : "inherit", fontWeight: "bold" }}>
+                        Total Time Left: {formatTime(totalTimeLeft)}
+                    </p>
+                    <p style={{ color: activeSubjectTimeLeft <= 120 ? "red" : "inherit", fontWeight: "bold" }}>
+                        Subject Time Left: {isSubjectLocked ? "🔒 Locked" : formatTime(activeSubjectTimeLeft)}
+                    </p>
+                </div>
+            </div>
+
+            <div className='row h-70'>
+                <div className='col-8 border'>
+                    {isSubjectLocked && (
+                        <div className='alert alert-danger mt-2'>
+                            This subject is locked. Time expired.
+                        </div>
+                    )}
+                    <div className='question mt-2'>{selectQuestion?.question_text}</div>
+                    <div className='options mt-3'>
+                        {selectQuestion?.options?.map((opt) => (
+                            <div className='option' key={opt.id}>
+                                <label htmlFor={`opt-${opt.id}`}>
+                                    <input
+                                        type='radio'
+                                        name='option'
+                                        checked={selectedOption === opt.id}
+                                        onChange={handleOptionChange}
+                                        id={`opt-${opt.id}`}
+                                        value={opt.id}
+                                        disabled={isSubjectLocked}
+                                    />{" "}
+                                    {opt.option_text}
+                                </label>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className='save-response d-flex justify-content-between mt-3 mb-2'>
+                        <div className='mark-review'>
+                            <button
+                                className='btn btn-primary mx-2'
+                                disabled={isSubjectLocked}
+                                onClick={() => {
+                                    handleQuestionStatus(selectQuestion?.id, "marked-for-review");
+                                    goToNextQuestion();
+                                }}>
+                                Mark for review & Save
+                            </button>
+                            <button
+                                className='btn btn-primary'
+                                disabled={isSubjectLocked}
+                                onClick={() => {
+                                    handleClearResponse(selectQuestion?.id);
+                                    handleQuestionStatus(selectQuestion?.id, "not-answered");
+                                    clearSelection();
+                                }}>
+                                Clear response
+                            </button>
+                        </div>
+                        <div className='save'>
+                            <button
+                                className='btn btn-primary'
+                                disabled={isSubjectLocked}
+                                onClick={() => {
+                                    if (!selectedOption) {
+                                        handleQuestionStatus(selectQuestion?.id, "not-answered");
+                                    } else {
+                                        saveAnswer(selectQuestion?.id, selectedOption);
+                                        handleQuestionStatus(selectQuestion?.id, "answered");
+                                    }
+                                    goToNextQuestion();
+                                }}>
+                                Save & Next
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div className='col-4 border'>
+                    <div className='question-pallet'>
+                        <p className='text-center'>Question Palette</p>
+                        <div className='row g-4 text-center'>
+                            {subjectQuestions?.map((que, index) => {
+                                let btn = "primary";
+                                const status = questionsStatus.find((q) => q.questionId === que.id);
+                                if (status?.status === "marked-for-review") btn = "info";
+                                else if (status?.status === "answered") btn = "success";
+                                else if (status?.status === "not-answered") btn = "danger";
+
+                                return (
+                                    <div className='pal-btn col-4' key={que.id}>
+                                        <button
+                                            className={`btn btn-${btn} col-4`}
+                                            onClick={() => handleQuestion(que.id)}>
+                                            {index + 1}
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                    <div className='row mt-5 mb-2'>
+                        <div className='col-12 text-center'>
+                            <button className='btn btn-primary' onClick={handleFinalSubmit}>
+                                Submit
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default ExamViewLayout;

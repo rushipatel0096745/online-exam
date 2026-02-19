@@ -32,7 +32,7 @@ router.route('/:examId/subjects').post(createSubject);
 router.route('/:examId/questions').get(getQuestionByExamId);
 router.route('/subjects/:subjectId/question').post(createQuestion);
 router.route('/submit-result/:examId').post(storeStudentResult);
-router.route('/results/result').get(getResultData);
+router.route('/results/result').post(getResultData);
 router.route('/user/create').post(createUserExams);
 router.route('/user/exams').post(getUserExams);
 router.route('/user/answers').post(getUserAnswers);
