@@ -29,6 +29,6 @@ router.route('/:examId/subjects').post(createSubject);
 router.route('/:examId/questions').get(getQuestionByExamId);
 router.route('/subjects/:subjectId/question').post(createQuestion);
 router.route('/submit-result/:examId').post(storeStudentResult);
-router.route('/result').post(getResultData);
+router.route('/result').get(getResultData);
 
 export default router;
