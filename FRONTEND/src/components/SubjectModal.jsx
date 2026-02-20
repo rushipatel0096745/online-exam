@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Modal, Button, Form, Alert, Spinner } from "react-bootstrap";
 
-const SubjectModal = ({ examId, show, onClose, onSuccess, mode }) => {
+const SubjectModal = ({ examId, show, onClose, onSuccess, mode, examType }) => {
     const url = "http://localhost:5000/api";
 
     const [name, setName] = useState("");
@@ -34,7 +34,7 @@ const SubjectModal = ({ examId, show, onClose, onSuccess, mode }) => {
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                         name: name.trim(),
-                        subject_duration_minutes: duration,
+                        subject_duration_minutes: duration || null,
                     }),
                 });
 
@@ -78,15 +78,18 @@ const SubjectModal = ({ examId, show, onClose, onSuccess, mode }) => {
                             autoFocus
                         />{" "}
                     </Form.Group>
-                    <Form.Group controlId='subjectDuration' className='mt-3'>
-                        <Form.Label>Duration (minutes)</Form.Label>
-                        <Form.Control
-                            type='number'
-                            value={duration}
-                            onChange={(e) => setDuration(e.target.value)}
-                            disabled={submitting}
-                        />
-                    </Form.Group>
+
+                    {examType === "CATEGORY" && (
+                        <Form.Group controlId='subjectDuration' className='mt-3'>
+                            <Form.Label>Duration (minutes)</Form.Label>
+                            <Form.Control
+                                type='number'
+                                value={duration}
+                                onChange={(e) => setDuration(e.target.value)}
+                                disabled={submitting}
+                            />
+                        </Form.Group>
+                    )}
                 </Modal.Body>
 
                 <Modal.Footer>

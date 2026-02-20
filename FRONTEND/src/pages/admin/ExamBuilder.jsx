@@ -151,8 +151,7 @@ const ExamBuilder = () => {
   const [error, setError] = useState(null);
   const [showAddSubjectModal, setShowAddSubjectModal] = useState(false);
   const [editSubject, setEditSubject] = useState(false);
-  const [mode, setMode] = useState();
-
+  const [examType, setExamType] = useState(null);
 
   const selectedSubject = useMemo(() => {
     return subjects.find((s) => s.id === selectedSubjectId) || null;
@@ -167,6 +166,7 @@ const ExamBuilder = () => {
         const data = await res.json();
 
         setExam(data.exam);
+        setExamType(data.exam.exam_type)
         setSubjects(data.subjects ?? []);
 
         if (data.subjects?.length > 0) {
@@ -280,6 +280,7 @@ const ExamBuilder = () => {
         onClose={() => setShowAddSubjectModal(false)}
         onSuccess={handleAddSubject}
         mode={editSubject ? 'edit' : 'create'}
+        examType={examType}
       />
     </Container>
   );

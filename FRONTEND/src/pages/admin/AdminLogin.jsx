@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import useFetch from "../../hooks/useFetch";
+import { useAuth } from "../../context/useAuth";
 
 const AdminLogin = () => {
     const {
@@ -14,31 +15,38 @@ const AdminLogin = () => {
 
     // const {data, loading, error} = useFetch();
 
+    const {user, login} = useAuth();
+
     useEffect(() => {}, []);
 
     const onSubmit = (data) => {
-        console.log(data);
-        // post data json to url
-        fetch("http://localhost:5000/api/admin/login", {
-            method: "POST",
-            body: JSON.stringify(data),
-            headers: {
-                "Content-Type": "application/json",
-            },
-        })
-            .then((res) => res.json())
-            .then((data) => {
-                console.log(data);
-                const user = data.data.user
-                localStorage.setItem(
-                    "user",
-                    JSON.stringify(user)
-                );
-                if (data.statusCode === 200) {
-                    navigate("/admin/dashboard");
-                }
-            })
-            .catch((error) => console.log("error for posting data", error));
+
+        if(login(data.email, data.password)) {
+            navigate('/admin/dashboard')
+        }
+
+        // console.log(data);
+        // // post data json to url
+        // fetch("http://localhost:5000/api/admin/login", {
+        //     method: "POST",
+        //     body: JSON.stringify(data),
+        //     headers: {
+        //         "Content-Type": "application/json",
+        //     },
+        // })
+        //     .then((res) => res.json())
+        //     .then((data) => {
+        //         console.log(data);
+        //         const user = data.data.user
+        //         localStorage.setItem(
+        //             "user",
+        //             JSON.stringify(user)
+        //         );
+        //         if (data.statusCode === 200) {
+        //             navigate("/admin/dashboard");
+        //         }
+        //     })
+        //     .catch((error) => console.log("error for posting data", error));
     };
 
     return (

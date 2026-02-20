@@ -6,13 +6,13 @@ import jwt from 'jsonwebtoken';
 
 // create exam
 const createExam = asyncHandler(async (req, res) => {
-    const { title, total_duration_minutes, is_active } = req.body;
+    const { title, total_duration_minutes, created_by, exam_type } = req.body;
 
     // const current_user = req.user;
 
-    if (!title || !total_duration_minutes || is_active === null) {
-        throw new ApiError(400, 'All fields are required');
-    }
+    // if (!title || !total_duration_minutes) {
+    //     throw new ApiError(400, 'All fields are required');
+    // }
 
     const [currenUserExams] = await pool.query('select * from exams where title = ?', [title]);
 
@@ -25,9 +25,9 @@ const createExam = asyncHandler(async (req, res) => {
 
     try {
         const [result] = await pool.query(
-            'INSERT INTO exams(title, total_duration_minutes, is_active, created_by) VALUES (?,?,?,?)',
+            'INSERT INTO exams(title, total_duration_minutes, is_active, exam_type, created_by) VALUES (?,?,?,?,?)',
             // [title, Number(total_duration_minutes), is_active, Number(current_user.id)]
-            [title, Number(total_duration_minutes), 0, 7]
+            [title, Number(total_duration_minutes), 0, exam_type, created_by]
         );
 
         const lastInsertId = result.insertId;
@@ -235,7 +235,7 @@ const getQuestionByExamId = asyncHandler(async (req, res) => {
     const { examId } = req.params;
 
     const [examRows] = await pool.query(
-        `SELECT id, title, total_duration_minutes 
+        `SELECT id, title, total_duration_minutes, exam_type 
          FROM exams 
          WHERE id = ? AND is_active = 0`,
         [examId]
@@ -358,7 +358,7 @@ const getResultData = asyncHandler(async (req, res) => {
          FROM subjects
          WHERE exam_id = ?
          ORDER BY id`,
-        [4]
+        [examId]
     );
 
     const [questionData] = await pool.query(
@@ -376,7 +376,7 @@ const getResultData = asyncHandler(async (req, res) => {
              SELECT id FROM subjects WHERE exam_id = ?
          )
          ORDER BY q.id`,
-        [4]
+        [examId]
     );
 
     const questionMap = {};
@@ -429,8 +429,8 @@ const getResultData = asyncHandler(async (req, res) => {
                                                 join subjects s on e.id = s.exam_id 
                                                 join questions q on q.subject_id = s.id 
                                                 join question_options qo on qo.question_id = q.id
-                                                where qo.is_correct = 1 and e.id = 4
-                                                `);
+                                                where qo.is_correct = 1 and e.id = ?
+                                                `, [examId]);
     let score = 0;
 
     question_result.map((que) => {

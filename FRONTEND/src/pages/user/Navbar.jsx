@@ -1,12 +1,12 @@
 import React from "react";
 import { useAuth } from "../../context/useAuth";
+import { Link } from "react-router-dom";
 
 const Navbar = () => {
-    const { user } = useAuth();
+    // const { user } = useAuth();
 
-
+    const user = JSON.parse(localStorage.getItem("user"))
     
-
     return (
         <nav className='navbar navbar-expand-lg bg-body-tertiary'>
             <div className='container-fluid'>
@@ -25,12 +25,15 @@ const Navbar = () => {
                 </button>
                 <div className='collapse navbar-collapse' id='navbarNavAltMarkup'>
                     <div className='navbar-nav'>
-                        <a className='nav-link active' aria-current='page' href='#'>
+                        <Link className='nav-link active' aria-current='page' to={'/student'}>
                             Home
-                        </a>
+                        </Link>
+                        <Link className='nav-link active' to={"/student/result"} aria-current='page'>
+                            Results
+                        </Link>
                     </div>
                 </div>
-                <div className='d-flex'>username{user && user.full_name}</div>
+                <div className='d-flex'>{user && user.full_name}</div>
             </div>
         </nav>
     );

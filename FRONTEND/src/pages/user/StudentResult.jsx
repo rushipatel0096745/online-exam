@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import Navbar from "./Navbar";
 
 const StudentResult = () => {
     const [examList, setExamList] = useState([]);
@@ -53,72 +54,73 @@ const StudentResult = () => {
     useEffect(() => {
         fetchExamList();
         fetchUserAnswers();
-    }, []); 
+    }, []);
     useEffect(() => {
         if (activeExam) fetchResultData();
-    }, [activeExam]); 
+    }, [activeExam]);
     return (
-        <div className='container'>
-            <div className='result'>
-                <h2>Results</h2>
-                <h4>Score: {score}</h4>
-            </div>
-            <div className='row'>
-                {examList?.map((exam) => (
-                    <button
-                        key={exam.exam_id}
-                        className='btn btn-primary'
-                        onClick={() => handleExam(exam)}>
-                        {exam?.title}
-                    </button>
-                ))}
-
-                <div className='col-4'>
-                    <div className='row'>
-                        <p>Exam name: {activeExam?.title}</p>
-                        <p>Time duration: {activeExam?.total_time}</p>
-                    </div>
-                    <div className='row'>
-                        {result?.map((subject) => (
-                            <div key={subject.id}>
-                                <div className='row'>
-                                    <p>Subject name : {subject?.name}</p>
-                                    <p>Time duration : {subject?.subject_duration_minutes}</p>
+        <>
+            <Navbar />
+            <div className='container'>
+                <div className='row'>
+                    <h1>Results</h1>
+                    {examList?.map((exam) => (
+                        <button key={exam?.exam_id} className='btn btn-primary' onClick={() => handleExam(exam)}>
+                            {exam?.title}
+                        </button>
+                    ))}
+                    <h3 className='mt-5'>Result details</h3>
+                    <div className='col-4'>
+                        <div className='row mb-4'>
+                            <p>Exam name: {activeExam?.title}</p>
+                            <p>Time duration: {activeExam?.total_time}</p>
+                            <p className="fs-2">
+                                <b>Total score: {score}</b>
+                            </p>
+                        </div>
+                        <div className='row mb-2'>
+                            {result?.map((subject) => (
+                                <div key={subject.id}>
+                                    <div className='row'>
+                                        <p>Subject name : {subject?.name}</p>
+                                        {/* <p>Time duration : {subject?.subject_duration_minutes}</p> */}
+                                    </div>
+                                    <div className='row'>
+                                        <table className='table'>
+                                            <thead>
+                                                <tr>
+                                                    <th scope='col'>#q_id</th>
+                                                    <th scope='col'>Question</th>
+                                                    <th scope='col'>Correct Answer</th>
+                                                    <th scope='col'>Submitted Answer</th>
+                                                    <th scope='col'>Marks</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {subject?.questions?.map((que) => {
+                                                    const flag = userAnswers?.find(
+                                                        (ans) => ans?.question_id === que?.id
+                                                    );
+                                                    return (
+                                                        <tr key={que?.id}>
+                                                            <th scope='row'>{que?.id}</th>
+                                                            <td>{que?.question_text}</td>
+                                                            <td>{que?.options[0]?.option_text}</td>
+                                                            <td>{flag ? flag.option_text : "Not Answered"}</td>
+                                                            <td>{que?.marks}</td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
-                                <div className='row'>
-                                    <table className='table'>
-                                        <thead>
-                                            <tr>
-                                                <th scope='col'>#q_id</th>
-                                                <th scope='col'>Question</th>
-                                                <th scope='col'>Correct Answer</th>
-                                                <th scope='col'>Marked Answer</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {subject?.questions?.map((que) => {
-                                                const flag = userAnswers?.find(
-                                                    (ans) => ans?.question_id === que?.id
-                                                );
-                                                return (
-                                                    <tr key={que?.id}>
-                                                        <th scope='row'>{que?.id}</th>
-                                                        <td>{que?.question_text}</td>
-                                                        
-                                                        <td>{que?.options[0]?.option_text}</td>
-                                                        <td>{flag ? flag.option_text : "Not Answered"}</td>
-                                                    </tr>
-                                                );
-                                            })}
-                                        </tbody>
-                                    </table>
-                                </div>  
-                            </div>
-                        ))}
+                            ))}
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </>
     );
 };
 

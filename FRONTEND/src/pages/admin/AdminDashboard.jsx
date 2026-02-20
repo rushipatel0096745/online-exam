@@ -29,7 +29,9 @@ const AdminDashboard = () => {
             {/* list all exams created */}
             <h1>Admin dashboard</h1>
             <div className='row h-75 overflow-y-auto'>
-                {examList.map((exam) => {
+                {
+                examList ? 
+                (examList.map((exam) => {
                     return (
                         <div className='col-3' key={exam.id}>
                             <div className='card border-dark mb-3' style={{ maxWidth: "18rem" }}>
@@ -49,7 +51,11 @@ const AdminDashboard = () => {
                             </div>
                         </div>
                     );
-                })}
+                })) : (
+                    <h3>No exams</h3>
+                )
+                
+                }
             </div>
             <div className='row'>
                 <div className='col-12'>
