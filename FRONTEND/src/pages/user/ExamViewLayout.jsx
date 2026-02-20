@@ -21,18 +21,18 @@ const ExamViewLayout = () => {
     const [selectedOption, setSelectedOption] = useState(null);
     const [questionsStatus, setQuestionsStatus] = useState([{ questionId: 0, status: "" }]);
     const [userAnswers, setUserAnswers] = useState([]);
-    // const [lockedSubjects, setLockedSubjects] = useState([]);
+    const [lockedSubjects, setLockedSubjects] = useState([]);
 
     // timers
     const [examTimer, setExamTimer] = useState(null);
-    // const [subjectTimers, setSubjectTimers] = useState({});
+    const [subjectTimers, setSubjectTimers] = useState({});
 
     // timers ref
     const examTimerRef = useRef(null);
     const subjectTimerRef = useRef(null);
     const subjectTimersRef = useRef({});
     const activeSubjectIdRef = useRef(null);
-    // const lockedSubjectsRef = useRef(null);
+    const lockedSubjectsRef = useRef([]);
 
     const navigate = useNavigate();
 
@@ -66,16 +66,18 @@ const ExamViewLayout = () => {
             setSelectQuestion(result.subjects[0]?.questions[0]);
 
             // set exam timer in seconds
-            startExamTimer(exam.total_duration_minutes);
-            startSubjectTimer(result.subjects[0]?.id);
-
-            // initialize the timer (convert minutes -> seconds)
-            const timers = {};
-            result.subjects.forEach((sub) => {
-                timers[sub.id] = sub.subject_duration_minutes * 60;
-            });
-            // setSubjectTimers(timers);
-            subjectTimersRef.current = { ...timers };
+            if (exam.exam_type === "FULL_EXAM") {
+                startExamTimer(exam.total_duration_minutes);
+            } else {
+                startSubjectTimer(result.subjects[0]?.id);
+                // initialize the timer (convert minutes -> seconds)
+                const timers = {};
+                result.subjects.forEach((sub) => {
+                    timers[sub.id] = sub.subject_duration_minutes * 60;
+                });
+                setSubjectTimers(timers);
+                subjectTimersRef.current = { ...timers };
+            }
         } catch (error) {
             console.log("error when fetching questions: ", error.data);
         }
@@ -100,33 +102,50 @@ const ExamViewLayout = () => {
         }, 1000);
     }
 
-    // function startSubjectTimer(subjectId) {
-    //     clearInterval(subjectTimerRef.current);
+    function startSubjectTimer(subjectId) {
+        clearInterval(subjectTimerRef.current);
 
-    //     subjectTimerRef.current = setInterval(() => {
-    //         const current = subjectTimersRef.current[subjectId]; // fetched current subject timer
+        subjectTimerRef.current = setInterval(() => {
+            const current = subjectTimersRef.current[subjectId]; // fetched current subject timer
 
-    //         if (current === undefined || current <= 0) {
-    //             clearInterval(subjectTimerRef.current);
-    //             return;
-    //         }
+            if (current === undefined || current <= 0) {
+                clearInterval(subjectTimerRef.current);
+                return;
+            }
 
-    //         const next = current - 1;
+            const next = current - 1;
 
-    //         setSubjectTimers((prev) => ({ ...prev, [subjectId]: next }));
+            setSubjectTimers((prev) => ({ ...prev, [subjectId]: next }));
 
-    //         if (next <= 0) {
-    //         }
-    //     }, 1000);
-    // }
+            if (next <= 0) {
+                clearInterval(subjectTimerRef.current);
+                setLockedSubjects((prev) => [...prev, subjectId]);
+                if(lockedSubjects.length === subjects.length) {
+                  submitExam();
+                } else {  
+                  gotoNextSubject();
+                }
+            }
+        }, 1000);
+    }
 
-    // function pauseSubjectTimer() {
-    //     clearInterval(subjectTimerRef.current);
-    // }
+    function pauseSubjectTimer() {
+        clearInterval(subjectTimerRef.current);
+    }
+
+    function gotoNextSubject() {
+        const remainingSubjects = subjects.map((sub) => {
+            if (!lockedSubjectsRef.includes(sub.id)) {
+                return sub.id;
+            }
+        });
+
+        handleSubject(remainingSubjects[i]);
+    }
 
     function handleSubject(subjectId) {
         // Pause current subject timer
-        // pauseSubjectTimer();
+        if (examType === "CATEGORY") pauseSubjectTimer();
 
         // Switch subject
         const subject = subjects.find((s) => s.id === subjectId);
@@ -135,10 +154,10 @@ const ExamViewLayout = () => {
             activeSubjectIdRef.current = subjectId;
             setSubjectQuestions(subject.questions);
             setSelectQuestion(subject.questions[0]);
-            handleQuestion(subject.questions[0].id)
+            handleQuestion(subject.questions[0].id);
 
             // Resume this subject timer
-            // startSubjectTimer(subjectId);
+            if (examType === "CATEGORY") startSubjectTimer(subjectId);
         }
     }
 
@@ -248,9 +267,13 @@ const ExamViewLayout = () => {
         }
     }
 
-    // useEffect(() => {
-    //     subjectTimersRef.current = subjectTimers;
-    // }, [subjectTimers]);
+    useEffect(() => {
+        subjectTimersRef.current = subjectTimers;
+    }, [subjectTimers]);
+
+    useEffect(() => {
+        lockedSubjectsRef.current = lockedSubjects;
+    }, [lockedSubjects]);
 
     useEffect(() => {
         fetchQuestions();
@@ -261,7 +284,7 @@ const ExamViewLayout = () => {
         };
     }, []);
 
-    // const activeSubjectTime = activeSubject ? subjectTimers[activeSubject.id] : null;
+    const activeSubjectTime = activeSubject ? subjectTimers[activeSubject.id] || null : null;
 
     return (
         <div className='container-fluid h-100'>
@@ -291,7 +314,7 @@ const ExamViewLayout = () => {
                     <div>
                         {/* <p>Total timer: {exam.time_duration}</p> */}
                         <p>Exam Time left: {formatTime(examTimer)}</p>
-                        {/* <p>Subject timer: {activeSubjectTime}</p> */}
+                        <p>Subject timer: {formatTime(activeSubjectTime)}</p>
                     </div>
                 </div>
             </div>
