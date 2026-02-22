@@ -3,9 +3,9 @@ import { useAuth } from "../../context/useAuth";
 import { Link } from "react-router-dom";
 
 const Navbar = () => {
-    // const { user } = useAuth();
+    const { user, logout } = useAuth();
 
-    const user = JSON.parse(localStorage.getItem("user"))
+    // const user = JSON.parse(localStorage.getItem("user"))
     
     return (
         <nav className='navbar navbar-expand-lg bg-body-tertiary'>
@@ -33,7 +33,10 @@ const Navbar = () => {
                         </Link>
                     </div>
                 </div>
-                <div className='d-flex'>{user && user.full_name}</div>
+                <div className='d-flex'>
+                    <p className='m-0'>{user && user.full_name}</p>
+                    <button className="btn btn-outline-danger ms-2" onClick={logout}>Logout</button>
+                    </div>
             </div>
         </nav>
     );

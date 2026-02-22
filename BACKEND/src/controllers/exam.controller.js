@@ -317,18 +317,21 @@ const getQuestionByExamId = asyncHandler(async (req, res) => {
 });
 
 const storeStudentResult = asyncHandler(async (req, res) => {
-    const { userId, answers } = req.body;
+    const { userId, answers, examId } = req.body;
 
+    console.log('Received answers:', answers);
     if (Array.isArray(answers)) {
         if (answers.length === 0) {
-            return;
+            return res
+                .status(200)
+                .json(new ApiResponse(200, 'Exam submitted successfully. No answers selected.'));
         }
 
-        const values = answers.map((ans) => [userId, ans.questionId, ans.selectedOptionId]);
+        const values = answers.map((ans) => [userId, ans.questionId, ans.selectedOptionId, examId]);
 
         try {
             const [result] = await pool.query(
-                'insert into user_answers(user_id, question_id, option_id) values ?',
+                'insert into user_answers(user_id, question_id, option_id, exam_id) values ?',
                 [values]
             );
             console.log(`Number of records inserted: ${result.affectedRows}`);
@@ -419,18 +422,23 @@ const getResultData = asyncHandler(async (req, res) => {
     const finalSubjects = Object.values(subjectMap);
     console.log(finalSubjects);
 
-    const [userAnswers] = await pool.query('select * from user_answers where user_id = ?', [
-        userId,
-    ]);
+    const [userAnswers] = await pool.query(
+        `SELECT question_id, option_id 
+     FROM user_answers 
+     WHERE user_id = ? AND exam_id = ?`,
+        [userId, examId]
+    );
 
-    const [question_result] =
-        await pool.query(`select q.id as question_id, q.question_text as question_text, qo.id as option_id, q.marks as marks
+    const [question_result] = await pool.query(
+        `select q.id as question_id, q.question_text as question_text, qo.id as option_id, q.marks as marks
                                                 from exams e 
                                                 join subjects s on e.id = s.exam_id 
                                                 join questions q on q.subject_id = s.id 
                                                 join question_options qo on qo.question_id = q.id
                                                 where qo.is_correct = 1 and e.id = ?
-                                                `, [examId]);
+                                                `,
+        [examId]
+    );
     let score = 0;
 
     question_result.map((que) => {
@@ -478,7 +486,7 @@ const getUserAnswers = asyncHandler(async (req, res) => {
                 from user_answers as u join question_options o on o.id = u.option_id where user_id = ?`,
         [userId]
     );
-    res.status(200).json(new ApiResponse(200, result, "user answers"))
+    res.status(200).json(new ApiResponse(200, result, 'user answers'));
 });
 
 const temp = function () {
@@ -531,5 +539,5 @@ export {
     getResultData,
     createUserExams,
     getUserExams,
-    getUserAnswers
+    getUserAnswers,
 };

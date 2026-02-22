@@ -1,0 +1,889 @@
+function subjectTimerMode(subject) {
+    if (subject.question_timer) return "QUESTION"
+    if (subject.sub_timer) return "SUBJECT"
+    return "NONE" // FULL_EXAM case
+}
+```
+
+---
+
+## How Each Flow Changes
+
+### On `fetchQuestions` (exam loads)
+```
+After setting first subject active:
+
+check subjectTimerMode(subjects[0])
+    ├── "SUBJECT"  → startSubjectTimer(subjects[0].id)   ← existing logic
+    ├── "QUESTION" → startQuestionTimer(subjects[0].questions[0], subjects[0])
+    └── "NONE"     → startExamTimer(...)                 ← existing logic
+```
+
+### New `startQuestionTimer(question, subject)`
+```
+startQuestionTimer(question, subject)
+    │
+    ├── clearInterval(questionTimerRef.current)  ← kill previous
+    ├── remaining = subject.question_timer (in seconds)
+    ├── questionTimeRef.current = remaining
+    ├── setQuestionTimer(remaining)   ← show on UI
+    │
+    └── setInterval every 1 second:
+            ├── remaining -= 1
+            ├── questionTimeRef.current = remaining
+            ├── setQuestionTimer(remaining)
+            │
+            └── IF remaining <= 0
+                    ├── clearInterval
+                    └── moveToNextQuestionOrSubject(question, subject)
+```
+
+### New `moveToNextQuestionOrSubject(question, subject)`
+```
+moveToNextQuestionOrSubject(currentQuestion, currentSubject)
+    │
+    ├── find currentIndex of question in subject.questions
+    │
+    ├── IF not last question
+    │       ├── nextQuestion = subject.questions[currentIndex + 1]
+    │       ├── setSelectQuestion(nextQuestion)
+    │       ├── loadSavedAnswer(nextQuestion.id)
+    │       └── startQuestionTimer(nextQuestion, currentSubject)
+    │
+    └── IF last question
+            ├── lock current subject
+            ├── newLocked = [...lockedSubjectsRef.current, currentSubject.id]
+            ├── lockedSubjectsRef.current = newLocked
+            ├── setLockedSubjects(newLocked)
+            │
+            ├── IF all subjects locked → submitExam()
+            └── ELSE → gotoNextSubject(newLocked)
+                            └── handleSubject will call startQuestionTimer
+                                for the next subject's first question
+```
+
+### Changes to `handleSubject`
+```
+handleSubject(subjectId)
+    │
+    ├── IF locked → return (existing)
+    │
+    ├── clearInterval(questionTimerRef.current)  ← NEW: kill question timer if any
+    ├── pauseSubjectTimer()  ← existing
+    │
+    ├── load subject, questions etc... (existing)
+    │
+    └── check subjectTimerMode(subject)
+            ├── "SUBJECT"  → startSubjectTimer(subjectId)     ← existing
+            ├── "QUESTION" → startQuestionTimer(subject.questions[0], subject)  ← NEW
+            └── "NONE"     → nothing (exam timer already running)
+```
+
+### Changes to `handleQuestion` (palette click)
+```
+handleQuestion(questionId)
+    │
+    ├── IF current subject has question_timer → BLOCK, do nothing
+    │       (user should not be able to skip questions)
+    │
+    └── ELSE → existing logic (find question, setSelectQuestion, loadSavedAnswer)
+```
+
+### Changes to `goToNextQuestion` (Save & Next button)
+```
+goToNextQuestion()
+    │
+    ├── IF current subject has question_timer
+    │       → also handled by timer, so just navigate
+    │       (timer will reset when question changes via startQuestionTimer)
+    │       BUT don't allow manual skip — hide "Save & Next" navigation
+    │       or only allow saving without moving
+    │
+    └── ELSE → existing logic
+
+
+UI CHANGES
+
+{examType === "FULL_EXAM" && (
+    <p>Exam Time left: {formatTime(examTimer)}</p>
+)}
+{activeSubject?.sub_timer && (
+    <p>Subject Time left: {formatTime(activeSubjectTime)}</p>
+)}
+{activeSubject?.question_timer && (
+    <p>Question Time left: {formatTime(questionTimer)}</p>
+)}
+
+FOR QUESTION PALLETE
+<button
+    className={`btn btn-${btn} col-4`}
+    disabled={activeSubject?.question_timer != null}  // lock palette
+    onClick={() => handleQuestion(que.id)}
+>
+    {index + 1}
+</button>
+
+
+FOR HID AND CHANGE SAVE AND NEXT BUTTON
+<button onClick={() => {
+    saveAnswer(selectQuestion?.id, selectedOption)
+    handleQuestionStatus(selectQuestion?.id, "answered")
+    // no goToNextQuestion() call here in question_timer mode
+}}>
+    {activeSubject?.question_timer ? "Save Answer" : "Save & Next"}
+</button>
+
+
+
+
+// Always pass subject directly as parameter, never read from activeSubject state
+// because inside setInterval, activeSubject is stale
+startQuestionTimer(question, subject)
+moveToNextQuestionOrSubject(question, subject)
+```
+
+---
+
+## Complete Question Timer Scenario
+```
+Exam loads → Physics subject active (question_timer = 90 seconds)
+├── Question 1 loads, timer starts 1:30
+├── User cannot click other questions in palette (disabled)
+├── User cannot click other subjects (not locked yet, but question timer controls flow)
+
+At 0:45 → user saves answer for Q1
+├── Answer stored in userAnswers
+├── Timer still running (saving doesn't reset timer)
+
+At 0:00 → Q1 timer expires
+├── Auto move to Q2
+├── loadSavedAnswer(Q2.id) → no saved answer, selectedOption = null
+├── New timer starts 1:30 for Q2
+
+... same for Q3, Q4 ...
+
+Last question (Q10) timer expires
+├── Physics subject locked 🔒
+├── lockedSubjects = [physicsId]
+├── gotoNextSubject called
+├── Next subject is Math (sub_timer = 10 min)
+├── handleSubject(mathId)
+│       └── subjectTimerMode = "SUBJECT" → startSubjectTimer
+├── Math subject active, Math timer starts 10:00
+├── User CAN freely click questions in Math palette
+
+Save Answer clicked
+    ├── IF selectedOption → saveAnswer(questionId, optionId)
+    ├── handleQuestionStatus(questionId, "answered" or "not-answered")
+    └── moveToNextQuestionOrSubject(currentQuestion, currentSubject)
+            ├── clearInterval(questionTimerRef.current)  ← kill current timer
+            ├── IF not last question
+            │       ├── nextQuestion = subject.questions[currentIndex + 1]
+            │       ├── setSelectQuestion(nextQuestion)
+            │       ├── loadSavedAnswer(nextQuestion.id)
+            │       └── startQuestionTimer(nextQuestion, currentSubject)
+            └── IF last question
+                    ├── lock subject
+                    └── gotoNextSubject or submitExam
+
+import React, { useEffect, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+
+const ExamViewLayout = () => {
+  const { examId } = useParams();
+  const user = JSON.parse(localStorage.getItem("user"));
+  const url = `http://localhost:5000/api/exams/${examId}/questions`;
+
+  // ─── State ────────────────────────────────────────────────────────────────
+  const [exam, setExam] = useState({ title: "", time_duration: "" });
+  const [examType, setExamType] = useState(null);
+  const [subjects, setSubjects] = useState([]);
+  const [activeSubject, setActiveSubject] = useState(null);
+  const [subjectQuestions, setSubjectQuestions] = useState([]);
+  const [selectQuestion, setSelectQuestion] = useState({});
+  const [selectedOption, setSelectedOption] = useState(null);
+  const [questionsStatus, setQuestionsStatus] = useState([{ questionId: 0, status: "" }]);
+  const [userAnswers, setUserAnswers] = useState([]);
+  const [lockedSubjects, setLockedSubjects] = useState([]);
+
+  // timers state (drives UI display only)
+  const [examTimer, setExamTimer] = useState(null);
+  const [subjectTimers, setSubjectTimers] = useState({});
+  const [questionTimer, setQuestionTimer] = useState(null);
+
+  // ─── Refs (avoid stale closures inside setInterval) ───────────────────────
+  const examTimerRef = useRef(null);
+  const subjectTimerRef = useRef(null);
+  const questionTimerRef = useRef(null);
+  const subjectTimersRef = useRef({});
+  const lockedSubjectsRef = useRef([]);
+  const subjectsRef = useRef([]);
+  const examTypeRef = useRef(null);
+  const userAnswersRef = useRef([]);
+  const activeSubjectRef = useRef(null);
+  const subjectQuestionsRef = useRef([]);
+  const selectQuestionRef = useRef({});
+
+  const navigate = useNavigate();
+
+  // ─── Keep refs in sync with state ─────────────────────────────────────────
+  useEffect(() => { subjectTimersRef.current = subjectTimers; }, [subjectTimers]);
+  useEffect(() => { lockedSubjectsRef.current = lockedSubjects; }, [lockedSubjects]);
+  useEffect(() => { subjectsRef.current = subjects; }, [subjects]);
+  useEffect(() => { examTypeRef.current = examType; }, [examType]);
+  useEffect(() => { userAnswersRef.current = userAnswers; }, [userAnswers]);
+  useEffect(() => { activeSubjectRef.current = activeSubject; }, [activeSubject]);
+  useEffect(() => { subjectQuestionsRef.current = subjectQuestions; }, [subjectQuestions]);
+  useEffect(() => { selectQuestionRef.current = selectQuestion; }, [selectQuestion]);
+
+  // ─── Helpers ──────────────────────────────────────────────────────────────
+
+  function formatTime(seconds) {
+    if (!seconds || seconds <= 0) return "00:00";
+    const m = Math.floor(seconds / 60).toString().padStart(2, "0");
+    const s = (seconds % 60).toString().padStart(2, "0");
+    return `${m}:${s}`;
+  }
+
+  // Returns which timer mode a subject uses
+  function getSubjectTimerMode(subject) {
+    if (!subject) return "NONE";
+    if (subject.question_timer) return "QUESTION";
+    if (subject.sub_timer) return "SUBJECT";
+    return "NONE";
+  }
+
+  function loadSavedAnswer(questionId) {
+    const savedAnswer = userAnswersRef.current.find((ans) => ans.questionId === questionId);
+    setSelectedOption(savedAnswer ? savedAnswer.selectedOptionId : null);
+  }
+
+  // ─── Fetch ────────────────────────────────────────────────────────────────
+
+  async function fetchQuestions() {
+    try {
+      const res = await fetch(url);
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.message);
+
+      const exam = result.exam;
+      setExam({ title: exam.title, time_duration: exam.total_duration_minutes });
+      setExamType(exam.exam_type);
+      examTypeRef.current = exam.exam_type;
+
+      setSubjects(result.subjects);
+      subjectsRef.current = result.subjects;
+
+      const firstSubject = result.subjects[0];
+      const firstQuestion = firstSubject?.questions[0];
+
+      setActiveSubject(firstSubject);
+      activeSubjectRef.current = firstSubject;
+      setSubjectQuestions(firstSubject?.questions);
+      subjectQuestionsRef.current = firstSubject?.questions;
+      setSelectQuestion(firstQuestion);
+      selectQuestionRef.current = firstQuestion;
+
+      if (exam.exam_type === "FULL_EXAM") {
+        startExamTimer(exam.total_duration_minutes);
+      } else {
+        // Build subject timers map only for sub_timer subjects
+        const timers = {};
+        result.subjects.forEach((sub) => {
+          if (sub.sub_timer) timers[sub.id] = sub.sub_timer * 60;
+        });
+        setSubjectTimers(timers);
+        subjectTimersRef.current = { ...timers };
+
+        // Start the correct timer for first subject
+        const mode = getSubjectTimerMode(firstSubject);
+        if (mode === "SUBJECT") startSubjectTimer(firstSubject.id);
+        if (mode === "QUESTION") startQuestionTimer(firstQuestion, firstSubject);
+      }
+    } catch (error) {
+      console.log("error when fetching questions: ", error.message);
+    }
+  }
+
+  // ─── Exam Timer (FULL_EXAM only) ──────────────────────────────────────────
+
+  function startExamTimer(duration) {
+    const totalTime = duration * 60;
+    setExamTimer(totalTime);
+    clearInterval(examTimerRef.current);
+    let remainingTime = totalTime;
+
+    examTimerRef.current = setInterval(() => {
+      remainingTime -= 1;
+      setExamTimer(remainingTime);
+      if (remainingTime <= 0) {
+        clearInterval(examTimerRef.current);
+        submitExam();
+      }
+    }, 1000);
+  }
+
+  // ─── Subject Timer (sub_timer mode) ───────────────────────────────────────
+
+  function startSubjectTimer(subjectId) {
+    clearInterval(subjectTimerRef.current);
+
+    subjectTimerRef.current = setInterval(() => {
+      const current = subjectTimersRef.current[subjectId];
+
+      if (current === undefined || current <= 0) {
+        clearInterval(subjectTimerRef.current);
+        return;
+      }
+
+      const next = current - 1;
+      subjectTimersRef.current = { ...subjectTimersRef.current, [subjectId]: next };
+      setSubjectTimers((prev) => ({ ...prev, [subjectId]: next }));
+
+      if (next <= 0) {
+        clearInterval(subjectTimerRef.current);
+        lockSubjectAndAdvance(subjectId);
+      }
+    }, 1000);
+  }
+
+  function pauseSubjectTimer() {
+    clearInterval(subjectTimerRef.current);
+  }
+
+  // ─── Question Timer (question_timer mode) ─────────────────────────────────
+
+  // subject passed directly as param — never read from state inside interval
+  function startQuestionTimer(question, subject) {
+    clearInterval(questionTimerRef.current);
+
+    let remaining = subject.question_timer; // already in seconds from DB
+    setQuestionTimer(remaining);
+
+    questionTimerRef.current = setInterval(() => {
+      remaining -= 1;
+      setQuestionTimer(remaining);
+
+      if (remaining <= 0) {
+        clearInterval(questionTimerRef.current);
+        // Time expired — move without saving
+        moveToNextQuestionOrSubject(question, subject);
+      }
+    }, 1000);
+  }
+
+  function stopQuestionTimer() {
+    clearInterval(questionTimerRef.current);
+    setQuestionTimer(null);
+  }
+
+  // Core navigation for question_timer mode.
+  // Called by BOTH timer expiry AND Save Answer button.
+  function moveToNextQuestionOrSubject(currentQuestion, currentSubject) {
+    clearInterval(questionTimerRef.current); // always kill timer first
+
+    // Use ref — this can be called from inside setInterval where state is stale
+    const questions = subjectQuestionsRef.current;
+    const currentIndex = questions.findIndex((q) => q.id === currentQuestion.id);
+    const isLastQuestion = currentIndex === questions.length - 1;
+
+    if (!isLastQuestion) {
+      // Move to next question in same subject
+      const nextQuestion = questions[currentIndex + 1];
+      setSelectQuestion(nextQuestion);
+      selectQuestionRef.current = nextQuestion;
+      loadSavedAnswer(nextQuestion.id);
+      startQuestionTimer(nextQuestion, currentSubject);
+    } else {
+      // Last question done — lock subject and advance
+      lockSubjectAndAdvance(currentSubject.id);
+    }
+  }
+
+  // ─── Subject Locking & Advancing ──────────────────────────────────────────
+
+  // Single function that locks a subject and decides what comes next.
+  // Used by both startSubjectTimer and moveToNextQuestionOrSubject.
+  function lockSubjectAndAdvance(subjectId) {
+    const newLocked = [...lockedSubjectsRef.current, subjectId];
+    lockedSubjectsRef.current = newLocked;
+    setLockedSubjects(newLocked);
+
+    if (newLocked.length >= subjectsRef.current.length) {
+      submitExam();
+    } else {
+      gotoNextSubject(newLocked);
+    }
+  }
+
+  function gotoNextSubject(lockedList = lockedSubjectsRef.current) {
+    const remainingSubjects = subjectsRef.current.filter(
+      (sub) => !lockedList.includes(sub.id)
+    );
+    if (remainingSubjects.length > 0) {
+      handleSubject(remainingSubjects[0].id);
+    }
+  }
+
+  // ─── Subject Switch ───────────────────────────────────────────────────────
+
+  function handleSubject(subjectId) {
+    if (lockedSubjectsRef.current.includes(subjectId)) return;
+
+    // Kill whichever timer is currently running
+    pauseSubjectTimer();
+    stopQuestionTimer();
+
+    const subject = subjectsRef.current.find((s) => s.id === subjectId);
+    if (!subject) return;
+
+    const firstQuestion = subject.questions[0];
+
+    setActiveSubject(subject);
+    activeSubjectRef.current = subject;
+    setSubjectQuestions(subject.questions);
+    subjectQuestionsRef.current = subject.questions;
+    setSelectQuestion(firstQuestion);
+    selectQuestionRef.current = firstQuestion;
+    loadSavedAnswer(firstQuestion?.id);
+
+    // Start the right timer for this subject
+    const mode = getSubjectTimerMode(subject);
+    if (mode === "SUBJECT") startSubjectTimer(subjectId);
+    if (mode === "QUESTION") startQuestionTimer(firstQuestion, subject);
+  }
+
+  // ─── Question Navigation ──────────────────────────────────────────────────
+
+  function handleQuestion(questionId) {
+    // Block all manual navigation in question_timer mode
+    if (getSubjectTimerMode(activeSubjectRef.current) === "QUESTION") return;
+
+    const question = subjectQuestions.find((q) => q.id === questionId);
+    if (question) {
+      setSelectQuestion(question);
+      loadSavedAnswer(questionId);
+    }
+  }
+
+  function goToNextQuestion() {
+    const currentIndex = subjectQuestions.findIndex((q) => q.id === selectQuestion?.id);
+    if (currentIndex !== -1 && currentIndex < subjectQuestions.length - 1) {
+      setSelectQuestion(subjectQuestions[currentIndex + 1]);
+    }
+  }
+
+  // ─── Answer Handling ──────────────────────────────────────────────────────
+
+  function handleOptionChange(event) {
+    setSelectedOption(Number(event.target.value));
+  }
+
+  function clearSelection() {
+    setSelectedOption(null);
+  }
+
+  function handleQuestionStatus(questionId, status) {
+    const exists = questionsStatus.find((q) => q.questionId === questionId);
+    if (!exists) {
+      setQuestionsStatus((prev) => [...prev, { questionId, status }]);
+    } else {
+      setQuestionsStatus((prev) =>
+        prev.map((q) => (q.questionId === questionId ? { ...q, status } : q))
+      );
+    }
+  }
+
+  function saveAnswer(questionId, optionId) {
+    // Update state for submit
+    setUserAnswers((prev) => {
+      const existing = prev.find((ans) => ans.questionId === questionId);
+      if (existing) {
+        return prev.map((ans) =>
+          ans.questionId === questionId ? { ...ans, selectedOptionId: optionId } : ans
+        );
+      }
+      return [...prev, { questionId, selectedOptionId: optionId }];
+    });
+    // Update ref immediately so loadSavedAnswer works on the same tick
+    const updated = userAnswersRef.current.filter((a) => a.questionId !== questionId);
+    userAnswersRef.current = [...updated, { questionId, selectedOptionId: optionId }];
+  }
+
+  // Save Answer button handler for question_timer mode
+  function handleSaveAndAdvance() {
+    const questionId = selectQuestion?.id;
+    const subject = activeSubjectRef.current;
+    const currentQuestion = selectQuestionRef.current;
+
+    if (selectedOption) {
+      saveAnswer(questionId, selectedOption);
+      handleQuestionStatus(questionId, "answered");
+    } else {
+      handleQuestionStatus(questionId, "not-answered");
+    }
+
+    // Move immediately — timer gets killed inside moveToNextQuestionOrSubject
+    moveToNextQuestionOrSubject(currentQuestion, subject);
+  }
+
+  // ─── Submit ───────────────────────────────────────────────────────────────
+
+  async function submitAnswers() {
+    try {
+      const res = await fetch(`http://localhost:5000/api/exams/submit-result/${examId}`, {
+        method: "POST",
+        body: JSON.stringify({ userId: user.id, answers: userAnswers }),
+        headers: { "Content-Type": "application/json" },
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.message);
+    } catch (error) {
+      console.log("Error in submitting answers", error.message);
+    }
+  }
+
+  async function submitExam() {
+    try {
+      await submitAnswers();
+      const res = await fetch(`http://localhost:5000/api/exams/user/create`, {
+        method: "POST",
+        body: JSON.stringify({ examId, userId: user.id }),
+        headers: { "Content-Type": "application/json" },
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.message);
+      navigate("/student/result");
+    } catch (error) {
+      console.log("Error in submitting exam", error.message);
+    }
+  }
+
+  // ─── Lifecycle ────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    fetchQuestions();
+    return () => {
+      clearInterval(examTimerRef.current);
+      clearInterval(subjectTimerRef.current);
+      clearInterval(questionTimerRef.current);
+    };
+  }, []);
+
+  // ─── Derived values for UI ────────────────────────────────────────────────
+
+  const activeSubjectTime = activeSubject ? subjectTimers[activeSubject.id] ?? null : null;
+  const timerMode = getSubjectTimerMode(activeSubject);
+  const isQuestionTimerMode = timerMode === "QUESTION";
+
+  // Current question index in the palette (for disabling past questions)
+  const currentQuestionIndex = subjectQuestions.findIndex(
+    (q) => q.id === selectQuestion?.id
+  );
+
+  // ─── Render ───────────────────────────────────────────────────────────────
+
+  return (
+    <div className="container-fluid h-100">
+      <div className="row h-30">
+
+        {/* Header: title + subject buttons */}
+        <div className="col-8 border">
+          <h4>{exam.title}</h4>
+          <div className="d-flex flex-end gap-2">
+            {subjects.map((subject) => {
+              const isLocked = lockedSubjects.includes(subject.id);
+              const isActive = activeSubject?.id === subject.id;
+              return (
+                <div className="sub-btn" key={subject.id}>
+                  <button
+                    className={`btn ${
+                      isLocked
+                        ? "btn-secondary"
+                        : isActive
+                        ? "btn-success"
+                        : "btn-primary"
+                    }`}
+                    onClick={() => handleSubject(subject.id)}
+                    disabled={isLocked || isQuestionTimerMode}
+                    title={
+                      isLocked
+                        ? "Time expired for this subject"
+                        : isQuestionTimerMode
+                        ? "Cannot switch subjects during question timer"
+                        : ""
+                    }
+                  >
+                    {subject.name} {isLocked ? "🔒" : ""}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Header: user info + correct timer */}
+        <div className="col-4 border">
+          <p><b className="fs-3">{user.full_name}</b></p>
+          <div>
+            {examType === "FULL_EXAM" && (
+              <p>⏱ Exam Time left: <b>{formatTime(examTimer)}</b></p>
+            )}
+            {timerMode === "SUBJECT" && (
+              <p>⏱ Subject Time left: <b>{formatTime(activeSubjectTime)}</b></p>
+            )}
+            {timerMode === "QUESTION" && (
+              <p>
+                ⏱ Question Time left:{" "}
+                <b className={questionTimer <= 10 ? "text-danger" : ""}>
+                  {formatTime(questionTimer)}
+                </b>
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="row h-70">
+
+        {/* Question area */}
+        <div className="col-8 border">
+          <div className="question mt-2">{selectQuestion?.question_text}</div>
+          <div className="options mt-3">
+            {selectQuestion?.options?.map((opt) => (
+              <div className="option" key={opt.id}>
+                <label htmlFor={`opt-${opt.id}`}>
+                  <input
+                    type="radio"
+                    name="option"
+                    checked={selectedOption === opt.id}
+                    onChange={handleOptionChange}
+                    id={`opt-${opt.id}`}
+                    value={opt.id}
+                  />{" "}
+                  {opt.option_text}
+                </label>
+              </div>
+            ))}
+          </div>
+
+          <div className="save-response d-flex justify-content-between mt-3 mb-2">
+            {isQuestionTimerMode ? (
+              /* question_timer mode: only Save Answer, no mark/clear/back */
+              <div className="save w-100 text-end">
+                <button className="btn btn-primary" onClick={handleSaveAndAdvance}>
+                  Save Answer
+                </button>
+              </div>
+            ) : (
+              /* sub_timer / FULL_EXAM mode: full controls */
+              <>
+                <div className="mark-review">
+                  <button
+                    className="btn btn-primary mx-2"
+                    onClick={() => {
+                      handleQuestionStatus(selectQuestion?.id, "marked-for-review");
+                      goToNextQuestion();
+                    }}
+                  >
+                    Mark for review & Save
+                  </button>
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => {
+                      handleQuestionStatus(selectQuestion?.id, "not-answered");
+                      clearSelection();
+                    }}
+                  >
+                    Clear response
+                  </button>
+                </div>
+                <div className="save">
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => {
+                      if (!selectedOption) {
+                        handleQuestionStatus(selectQuestion?.id, "not-answered");
+                      } else {
+                        saveAnswer(selectQuestion?.id, selectedOption);
+                        handleQuestionStatus(selectQuestion?.id, "answered");
+                      }
+                      goToNextQuestion();
+                    }}
+                  >
+                    Save & Next
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Question palette */}
+        <div className="col-4 border">
+          <div className="question-pallet">
+            <p className="text-center">Question Palette</p>
+            {isQuestionTimerMode && (
+              <p className="text-center text-muted small">
+                ⚠️ Navigation disabled in question timer mode
+              </p>
+            )}
+            <div className="row g-4 text-center">
+              {subjectQuestions?.map((que, index) => {
+                let btn = "primary";
+                questionsStatus.forEach((ques) => {
+                  if (ques.questionId === que.id) {
+                    if (ques.status === "marked-for-review") btn = "info";
+                    else if (ques.status === "answered") btn = "success";
+                    else btn = "danger";
+                  }
+                });
+
+                const isCurrentQuestion = selectQuestion?.id === que.id;
+                // Past questions = index less than current (can't go back)
+                const isPastQuestion = index < currentQuestionIndex;
+
+                return (
+                  <div className="pal-btn col-4" key={que.id}>
+                    <button
+                      className={`btn btn-${btn} col-4 ${
+                        isCurrentQuestion ? "border border-dark border-3" : ""
+                      }`}
+                      onClick={() => handleQuestion(que.id)}
+                      disabled={isQuestionTimerMode || isPastQuestion}
+                      title={
+                        isQuestionTimerMode
+                          ? "Navigation disabled in question timer mode"
+                          : isPastQuestion
+                          ? "Cannot go back to previous questions"
+                          : ""
+                      }
+                    >
+                      {index + 1}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="row mt-5 mb-2">
+            <div className="col-12 text-center">
+              <button
+                className="btn btn-danger"
+                onClick={submitExam}
+                disabled={isQuestionTimerMode}
+                title={isQuestionTimerMode ? "Cannot manually submit during question timer" : ""}
+              >
+                Submit Exam
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default ExamViewLayout;
+
+
+
+<div className="container-fluid py-4">
+
+  {/* -------- Page Title -------- */}
+  <div className="row mb-4">
+    <div className="col-12">
+      <h2 className="fw-bold">Results</h2>
+    </div>
+  </div>
+
+  {/* -------- Exam Selection Buttons -------- */}
+  <div className="row mb-4">
+    <div className="col-12 d-flex flex-wrap gap-2">
+      {examList?.map((exam) => (
+        <button
+          key={exam?.exam_id}
+          className="btn btn-outline-primary"
+          onClick={() => handleExam(exam)}
+        >
+          {exam?.title}
+        </button>
+      ))}
+    </div>
+  </div>
+
+  {/* -------- Exam Summary Card -------- */}
+  {activeExam && (
+    <div className="row mb-4">
+      <div className="col-12">
+        <div className="card shadow-sm p-3">
+          <div className="row">
+            <div className="col-md-4">
+              <p><strong>Exam Name:</strong> {activeExam?.title}</p>
+              <p><strong>Duration:</strong> {activeExam?.total_time}</p>
+            </div>
+            <div className="col-md-4 text-md-center">
+              <h4 className="text-success">
+                Total Score: {score}
+              </h4>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )}
+
+  {/* -------- Subject-wise Results -------- */}
+  {result?.map((subject) => (
+    <div key={subject.id} className="row mb-5">
+      <div className="col-12">
+
+        <h4 className="mb-3">{subject?.name}</h4>
+
+        <div className="table-responsive">
+          <table className="table table-bordered table-striped align-middle">
+            <thead className="table-dark">
+              <tr>
+                <th>#</th>
+                <th>Question</th>
+                <th>Correct Answer</th>
+                <th>Your Answer</th>
+                <th>Marks</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {subject?.questions?.map((que, index) => {
+                const submitted = userAnswers?.find(
+                  (ans) => ans?.question_id === que?.id
+                );
+
+                const isCorrect =
+                  submitted && submitted.option_id === que?.options[0]?.id;
+
+                return (
+                  <tr key={que?.id}>
+                    <td>{index + 1}</td>
+                    <td>{que?.question_text}</td>
+                    <td>{que?.options[0]?.option_text}</td>
+                    <td className={isCorrect ? "text-success" : "text-danger"}>
+                      {submitted ? submitted.option_text : "Not Answered"}
+                    </td>
+                    <td>{isCorrect ? que?.marks : 0}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+  ))}
+
+</div>
+
+
+
+

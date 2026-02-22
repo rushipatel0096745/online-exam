@@ -12,11 +12,10 @@ const ExamViewLayout = () => {
   const [questionsStatus, setQuestionsStatus] = useState([]);
   const [userAnswers, setUserAnswers] = useState([]);
 
-  // TIMER STATES
+  // timer states
   const [examTimeLeft, setExamTimeLeft] = useState(0);
   const [subjectTimers, setSubjectTimers] = useState({});
 
-  // ---------------- FETCH QUESTIONS ----------------
   async function fetchQuestions() {
     try {
       const res = await fetch(url);
@@ -36,10 +35,10 @@ const ExamViewLayout = () => {
       setSubjectQuestions(result.subjects[0]?.questions);
       setSelectQuestion(result.subjects[0]?.questions[0]);
 
-      // Initialize total exam timer
+      // initialize total exam timer
       setExamTimeLeft(exam.total_duration_minutes * 60);
 
-      // Initialize subject timers
+      // initialize subject timers
       const timers = {};
       result.subjects.forEach((sub) => {
         timers[sub.id] = sub.subject_duration_minutes * 60;

@@ -11,14 +11,14 @@ const studentLogin = asyncHandler(async (req, res) => {
     const [users] = await pool.query('SELECT * FROM users where email = ?', [email]);
 
     if(users.length === 0) {
-       return res.status(404).json(new ApiResponse(404, "", "no user found"))
+        return res.status(400).json(new ApiResponse(400, "", "Invalid email or password"))
     }
 
     const user = users[0];
     const isPasswordValid = await bcrypt.compare(password, user.password_hash);
 
     if(!isPasswordValid) {
-        return res.status(400).json(new ApiResponse(40, "", "Invalid email or password"))
+        return res.status(400).json(new ApiResponse(400, "", "Invalid email or password"))
     }
 
     res.status(200).json(
