@@ -21,7 +21,7 @@ const StudentDashboard = () => {
 
     function handleModal(exam) {
         handleShow();
-        setActiveExam(exam)
+        setActiveExam(exam);
     }
 
     useEffect(() => {
@@ -29,46 +29,57 @@ const StudentDashboard = () => {
     }, []);
 
     return (
-        <div className='container-fluid'>
+        <>
             <Navbar />
-            <div className='container h-50'>
-                <h1 className='mb-4 mt-4'>All the exams</h1>
-                <div className='row h-75 overflow-y-auto'>
-                    {exams.map((exam) => {
-                        return (
-                            <div className='col-3' key={exam.id}>
-                                <div className='card border-dark mb-3' style={{ maxWidth: "18rem" }}>
-                                    <div className='card-header'>Exam ID: #{exam.id}</div>
-                                    <div className='card-body'>
-                                        <h5 className='card-title'>{exam.title}</h5>
-                                        <p className='card-text'>Creted On: {exam.created_at}</p>
-                                        <div className='d-flex justify-content-between'>
-                                            <button className='btn btn-primary' onClick={() => {handleModal(exam)}}>
-                                                Start exam
-                                            </button>
+            <div className='container-fluid'>
+                <div className='container h-50'>
+                    <h1 className='mb-4 mt-4'>All the exams</h1>
+                    <div className='row h-75 overflow-y-auto'>
+                        {exams.map((exam) => {
+                            let date = exam.created_at.split("T");
+                            let newDate = new Date(date[0]);
+                            newDate = newDate.toLocaleDateString();
+                            return (
+                                <div className='col-3' key={exam.id}>
+                                    <div className='card border-dark mb-3' style={{ maxWidth: "18rem" }}>
+                                        <div className='card-header'>Exam ID: #{exam.id}</div>
+                                        <div className='card-body'>
+                                            <h5 className='card-title'>{exam.title}</h5>
+                                            {/* <p className='card-text'>Creted On: {date.toString()}</p> */}
+                                            <p className='card-text'>Creted On: {newDate}</p>
+                                            <div className='d-flex justify-content-between'>
+                                                <button
+                                                    className='btn btn-primary'
+                                                    onClick={() => {
+                                                        handleModal(exam);
+                                                    }}>
+                                                    Start exam
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        );
-                    })}
+                            );
+                        })}
+                    </div>
                 </div>
-            </div>
 
-            {/* modal for start exam */}
-            <Modal show={show} onHide={handleClose} backdrop='static' keyboard={false}>
-                <Modal.Header closeButton>
-                    <Modal.Title>{activeExam?.title}</Modal.Title>
-                </Modal.Header>
-                <Modal.Body>Start the exam ?</Modal.Body>
-                <Modal.Footer>
-                    <Button variant='secondary' onClick={handleClose}>
-                        Close
-                    </Button>
-                    <Link to={`/student/exam/${activeExam?.id}`} className="btn btn-primary" variant='primary'>Start</Link>
-                </Modal.Footer>
-            </Modal>
-        </div>
+                <Modal show={show} onHide={handleClose} backdrop='static' keyboard={false}>
+                    <Modal.Header closeButton>
+                        <Modal.Title>{activeExam?.title}</Modal.Title>
+                    </Modal.Header>
+                    <Modal.Body>Start the exam ?</Modal.Body>
+                    <Modal.Footer>
+                        <Button variant='secondary' onClick={handleClose}>
+                            Close
+                        </Button>
+                        <Link to={`/student/exam/${activeExam?.id}`} className='btn btn-primary' variant='primary'>
+                            Start
+                        </Link>
+                    </Modal.Footer>
+                </Modal>
+            </div>
+        </>
     );
 };
 

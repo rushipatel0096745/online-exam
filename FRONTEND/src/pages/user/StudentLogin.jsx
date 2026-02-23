@@ -19,24 +19,6 @@ const StudentLogin = () => {
     if (login(data.email, data.password)) {
       navigate("/student");
     }
-    // post data json to url
-    // fetch("http://localhost:5000/api/student/login", {
-    //     method: "POST",
-    //     body: JSON.stringify(data),
-    //     headers: {
-    //         "Content-Type": "application/json",
-    //     },
-    // })
-    //     .then((res) => res.json())
-    //     .then((data) => {
-    //         console.log(data);
-    //         const user = data.data.user;
-    //         localStorage.setItem("user", JSON.stringify(user));
-    //         if (data.statusCode === 200) {
-    //            console.log(data)
-    //         }
-    //     })
-    //     .catch((error) => console.log("error for posting data", error));
   };
 
   return (

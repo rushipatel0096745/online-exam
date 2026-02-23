@@ -16,64 +16,20 @@ function App() {
         <AuthProvider>
             <ExamContextProvider>
                 <Routes>
+                    <Route path='/' element={<StudentLogin />} />
+                    <Route path='/admin/login' element={<AdminLogin />} />
 
-                    <Route path="/" element={<StudentLogin />} />
-                    <Route path="/admin/login" element={<AdminLogin />} />
+                    <Route element={<ProtectedRoute allowedRoles={["student"]} />}>
+                        <Route path='/student' element={<StudentDashboard />} />
+                        <Route path='/student/exam/:examId' element={<ExamViewLayout />} />
+                        <Route path='/student/result' element={<StudentResult />} />
+                    </Route>
 
-                    <Route
-                        path="/student"
-                        element={
-                            <ProtectedRoute allowedRoles={["student"]}>
-                                <StudentDashboard />
-                            </ProtectedRoute>
-                        }
-                    />
-
-                    <Route
-                        path="/student/exam/:examId"
-                        element={
-                            <ProtectedRoute allowedRoles={["student"]}>
-                                <ExamViewLayout />
-                            </ProtectedRoute>
-                        }
-                    />
-
-                    <Route
-                        path="/student/result"
-                        element={
-                            <ProtectedRoute allowedRoles={["student"]}>
-                                <StudentResult />
-                            </ProtectedRoute>
-                        }
-                    />
-
-                    <Route
-                        path="/admin/dashboard"
-                        element={
-                            <ProtectedRoute allowedRoles={["admin"]}>
-                                <AdminDashboard />
-                            </ProtectedRoute>
-                        }
-                    />
-
-                    <Route
-                        path="/admin/exam/create"
-                        element={
-                            <ProtectedRoute allowedRoles={["admin"]}>
-                                <ExamCreate />
-                            </ProtectedRoute>
-                        }
-                    />
-
-                    <Route
-                        path="/admin/exam/:examId/create"
-                        element={
-                            <ProtectedRoute allowedRoles={["admin"]}>
-                                <ExamBuilder />
-                            </ProtectedRoute>
-                        }
-                    />
-
+                    <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+                        <Route path='/admin/dashboard' element={<AdminDashboard />} />
+                        <Route path='/admin/exam/create' element={<ExamCreate />} />
+                        <Route path='/admin/exam/:examId/create' element={<ExamBuilder />} />
+                    </Route>
                 </Routes>
             </ExamContextProvider>
         </AuthProvider>
@@ -81,4 +37,3 @@ function App() {
 }
 
 export default App;
-

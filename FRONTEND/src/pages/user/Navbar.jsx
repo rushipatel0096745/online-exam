@@ -6,13 +6,13 @@ const Navbar = () => {
     const { user, logout } = useAuth();
 
     // const user = JSON.parse(localStorage.getItem("user"))
-    
+
     return (
         <nav className='navbar navbar-expand-lg bg-body-tertiary'>
             <div className='container-fluid'>
-                <a className='navbar-brand' href='#'>
+                <Link className='navbar-brand' to={"/student"}>
                     Navbar
-                </a>
+                </Link>
                 <button
                     className='navbar-toggler'
                     type='button'
@@ -25,7 +25,7 @@ const Navbar = () => {
                 </button>
                 <div className='collapse navbar-collapse' id='navbarNavAltMarkup'>
                     <div className='navbar-nav'>
-                        <Link className='nav-link active' aria-current='page' to={'/student'}>
+                        <Link className='nav-link active' aria-current='page' to={"/student"}>
                             Home
                         </Link>
                         <Link className='nav-link active' to={"/student/result"} aria-current='page'>
@@ -35,8 +35,10 @@ const Navbar = () => {
                 </div>
                 <div className='d-flex'>
                     <p className='m-0'>{user && user.full_name}</p>
-                    <button className="btn btn-outline-danger ms-2" onClick={logout}>Logout</button>
-                    </div>
+                    <button className='btn btn-outline-danger ms-2' onClick={logout}>
+                        Logout
+                    </button>
+                </div>
             </div>
         </nav>
     );

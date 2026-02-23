@@ -13,40 +13,15 @@ const AdminLogin = () => {
 
     const navigate = useNavigate();
 
-    // const {data, loading, error} = useFetch();
-
-    const {user, login} = useAuth();
+    const { user, login, error } = useAuth();
 
     useEffect(() => {}, []);
 
-    const onSubmit = (data) => {
-
-        if(login(data.email, data.password)) {
-            navigate('/admin/dashboard')
+    const onSubmit = async(data) => {
+        const success = await login(data.email, data.password);
+        if (success) {
+            navigate("/admin/dashboard");
         }
-
-        // console.log(data);
-        // // post data json to url
-        // fetch("http://localhost:5000/api/admin/login", {
-        //     method: "POST",
-        //     body: JSON.stringify(data),
-        //     headers: {
-        //         "Content-Type": "application/json",
-        //     },
-        // })
-        //     .then((res) => res.json())
-        //     .then((data) => {
-        //         console.log(data);
-        //         const user = data.data.user
-        //         localStorage.setItem(
-        //             "user",
-        //             JSON.stringify(user)
-        //         );
-        //         if (data.statusCode === 200) {
-        //             navigate("/admin/dashboard");
-        //         }
-        //     })
-        //     .catch((error) => console.log("error for posting data", error));
     };
 
     return (
@@ -82,6 +57,9 @@ const AdminLogin = () => {
                 <button type='submit' className='btn btn-primary'>
                     Submit
                 </button>
+                <div className='mt-3'>
+                    <span className='text-danger'>{error}</span>
+                </div>
             </form>
         </div>
     );
