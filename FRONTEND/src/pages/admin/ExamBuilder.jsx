@@ -108,7 +108,6 @@ const ExamBuilder = () => {
     <Container fluid className="p-0">
       <Row className="g-0" style={{ minHeight: "100vh" }}>
 
-        {/* Sidebar */}
         <Col xs={12} md={4} lg={3} className="border-end bg-light">
           <SubjectSidebar
             subjects={subjects}
@@ -122,7 +121,6 @@ const ExamBuilder = () => {
           />
         </Col>
 
-        {/* Main Content */}
         <Col xs={12} md={8} lg={9} className="p-4 bg-dark text-light">
           {selectedSubject ? (
             <SubjectContent

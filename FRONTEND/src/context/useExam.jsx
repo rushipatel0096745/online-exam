@@ -9,7 +9,6 @@ export const ExamContextProvider = function ({ children }) {
 
     const [questionsStatus, setQuestionsStatus] = useState();
 
-    // mark for review, answered, not answered
     function handleQuestionStatus() {
         setQuestionStatus((prev) => [])
     }

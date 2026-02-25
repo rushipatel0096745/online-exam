@@ -21,7 +21,6 @@ const SubjectSidebar = ({
                 backgroundColor: "#1e1e2f",
                 color: "#e4e6eb",
             }}>
-            {/* Header */}
             <Stack
                 direction='horizontal'
                 className='justify-content-between align-items-center px-3 py-3 border-bottom'
@@ -36,7 +35,6 @@ const SubjectSidebar = ({
                 </Button>
             </Stack>
 
-            {/* Subject List */}
             <div className='flex-grow-1 overflow-auto'>
                 {subjects && subjects.length > 0 ? (
                     <ListGroup variant='flush'>

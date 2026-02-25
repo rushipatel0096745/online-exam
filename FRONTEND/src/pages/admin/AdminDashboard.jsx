@@ -26,7 +26,6 @@ const AdminDashboard = () => {
 
     return (
         <div className='container'>
-            {/* list all exams created */}
             <h1>Admin dashboard</h1>
             <div className='row h-75 overflow-y-auto'>
                 {

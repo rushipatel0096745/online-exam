@@ -9,7 +9,6 @@ const SubjectContent = ({ subject, onAddQuestion }) => {
   return (
     <div>
 
-      {/* Header */}
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
           <h4 className="text-light mb-1">{subject.name}</h4>
@@ -23,7 +22,6 @@ const SubjectContent = ({ subject, onAddQuestion }) => {
         </Button>
       </div>
 
-      {/* Question List */}
       {subject.questions && subject.questions.length > 0 ? (
         subject.questions.map((q) => (
           <Card
@@ -46,7 +44,6 @@ const SubjectContent = ({ subject, onAddQuestion }) => {
         </div>
       )}
 
-      {/* Modal */}
       <AddQuestionModal
         subjectId={subject.id}
         show={showModal}

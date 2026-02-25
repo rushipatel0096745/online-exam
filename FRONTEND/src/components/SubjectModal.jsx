@@ -10,7 +10,6 @@ const SubjectModal = ({ examId, show, onClose, onSuccess, mode, examType }) => {
     const [error, setError] = useState(null);
 
     const handleClose = () => {
-        // Reset state on close
         setName("");
         setError(null);
         setSubmitting(false);
